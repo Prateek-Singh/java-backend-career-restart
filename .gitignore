@@ -1,0 +1,7 @@
+.idea/
+*.iml
+target/
+.DS_Store
+*.log
+.env
+docker-compose.yml
