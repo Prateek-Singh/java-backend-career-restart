@@ -1,5 +1,8 @@
 package com.prateek.learning.day01.java;
 
+import com.prateek.learning.day03.java.exceptions.InvalidTransactionAmountException;
+import com.prateek.learning.day03.java.exceptions.TransactionNotFoundException;
+
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -138,5 +141,44 @@ public class TransactionService {
 //                Transaction::getAccountId,
 //                Transaction::getAmount,
 //                BigDecimal::add));
+    }
+
+    public Transaction findById(
+            List<Transaction> transactions,
+            String transactionId
+    ) {
+        if (transactionId == null || transactionId.isBlank()) {
+            throw new IllegalArgumentException("Transaction ID is required");
+        }
+
+        if (transactions == null || transactions.isEmpty()) {
+            throw new TransactionNotFoundException(
+                    "Transaction not found for ID: " + transactionId
+            );
+        }
+
+        return transactions.stream()
+                .filter(Objects::nonNull)
+                .filter(txn -> transactionId.equals(txn.getId()))
+                .findFirst()
+                .orElseThrow(() ->
+                        new TransactionNotFoundException(
+                                "Transaction not found for ID: " + transactionId
+                        )
+                );
+    }
+
+    public void validateAmount(BigDecimal amount) {
+        if (amount == null) {
+            throw new InvalidTransactionAmountException(
+                    "Transaction amount is required"
+            );
+        }
+
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidTransactionAmountException(
+                    "Transaction amount must be greater than zero"
+            );
+        }
     }
 }

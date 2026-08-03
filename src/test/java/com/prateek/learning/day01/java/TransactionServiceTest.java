@@ -1,5 +1,7 @@
 package com.prateek.learning.day01.java;
 
+import com.prateek.learning.day03.java.exceptions.InvalidTransactionAmountException;
+import com.prateek.learning.day03.java.exceptions.TransactionNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -119,6 +121,106 @@ class TransactionServiceTest {
                 new BigDecimal("2750.50")
                         .compareTo(result.get("ACC-1002"))
         );
+    }
+
+    @Test
+    void shouldThrowIllegalArgumentExceptionForBlankTransactionId() {
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> transactionService.findById(createSampleTransactions(), "")
+        );
+
+        assertEquals("Transaction ID is required", exception.getMessage());
+    }
+
+    @Test
+    void shouldThrowTransactionNotFoundExceptionForNullTransactions() {
+        TransactionNotFoundException exception = assertThrows(
+                TransactionNotFoundException.class,
+                () -> transactionService.findById(null, "TXN-001")
+        );
+
+        assertEquals(
+                "Transaction not found for ID: TXN-001",
+                exception.getMessage()
+        );
+    }
+
+    @Test
+    void shouldThrowTransactionNotFoundExceptionForMissingTransactionId() {
+        TransactionNotFoundException exception = assertThrows(
+                TransactionNotFoundException.class,
+                () -> transactionService.findById(
+                        createSampleTransactions(),
+                        "TXN-0015"
+                )
+        );
+
+        assertEquals(
+                "Transaction not found for ID: TXN-0015",
+                exception.getMessage()
+        );
+    }
+
+    @Test
+    void shouldThrowInvalidTransactionAmountExceptionForNullAmount() {
+        InvalidTransactionAmountException exception = assertThrows(
+                InvalidTransactionAmountException.class,
+                () -> transactionService.validateAmount(null)
+        );
+
+        assertEquals(
+                "Transaction amount is required",
+                exception.getMessage()
+        );
+    }
+
+    @Test
+    void shouldThrowInvalidTransactionAmountExceptionForZeroAmount() {
+        InvalidTransactionAmountException exception = assertThrows(
+                InvalidTransactionAmountException.class,
+                () -> transactionService.validateAmount(BigDecimal.ZERO)
+        );
+
+        assertEquals(
+                "Transaction amount must be greater than zero",
+                exception.getMessage()
+        );
+    }
+
+    @Test
+    void shouldThrowInvalidTransactionAmountExceptionForNegativeAmount() {
+        InvalidTransactionAmountException exception = assertThrows(
+                InvalidTransactionAmountException.class,
+                () -> transactionService.validateAmount(
+                        new BigDecimal("-15.00")
+                )
+        );
+
+        assertEquals(
+                "Transaction amount must be greater than zero",
+                exception.getMessage()
+        );
+    }
+
+    @Test
+    void shouldNotThrowExceptionForPositiveAmount() {
+        assertDoesNotThrow(
+                () -> transactionService.validateAmount(
+                        new BigDecimal("15.00")
+                )
+        );
+    }
+
+    @Test
+    void shouldReturnExistingTransaction() {
+        Transaction transaction = transactionService.findById(
+                createSampleTransactions(),
+                "TXN-001"
+        );
+
+        assertNotNull(transaction);
+        assertEquals("TXN-001", transaction.getId());
     }
 
     private static List<Transaction> createSampleTransactions() {
