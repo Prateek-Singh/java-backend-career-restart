@@ -2,12 +2,22 @@ package com.prateek.learning.day01.java;
 
 import com.prateek.learning.day03.java.exceptions.InvalidTransactionAmountException;
 import com.prateek.learning.day03.java.exceptions.TransactionNotFoundException;
+import com.prateek.learning.day04.java.springboot.dto.CreateTransactionRequest;
+import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Service
 public class TransactionService {
+
+    private final List<Transaction> transactions = createSampleTransactions();
+
+    public List<Transaction> findByAccountId(String accountId) {
+        return findByAccountId(transactions, accountId);
+    }
 
     List<Transaction> findByAccountId(List<Transaction> transactions, String accountId) {
         if (transactions == null || transactions.isEmpty() || accountId == null || accountId.isBlank()) {
@@ -143,6 +153,10 @@ public class TransactionService {
 //                BigDecimal::add));
     }
 
+    public Transaction findById(String transactionId) {
+        return findById(transactions, transactionId);
+    }
+
     public Transaction findById(
             List<Transaction> transactions,
             String transactionId
@@ -180,5 +194,149 @@ public class TransactionService {
                     "Transaction amount must be greater than zero"
             );
         }
+    }
+
+    private static List<Transaction> createSampleTransactions() {
+        List<Transaction> transactions = new ArrayList<>();
+
+        transactions.add(new Transaction(
+                "TXN-001",
+                "ACC-1001",
+                new BigDecimal("25000.00"),
+                "CREDIT",
+                "Monthly Salary",
+                LocalDateTime.of(2026, 8, 1, 9, 30)
+        ));
+
+        transactions.add(new Transaction(
+                "TXN-002",
+                "ACC-1001",
+                new BigDecimal("-1250.50"),
+                "DEBIT",
+                "Electricity Bill Payment",
+                LocalDateTime.of(2026, 8, 1, 11, 15)
+        ));
+
+        transactions.add(new Transaction(
+                "TXN-003",
+                "ACC-1002",
+                new BigDecimal("5000.00"),
+                "CREDIT",
+                "Freelance Project PAYMENT",
+                LocalDateTime.of(2026, 8, 1, 12, 0)
+        ));
+
+        transactions.add(new Transaction(
+                "TXN-004",
+                "ACC-1002",
+                new BigDecimal("-750.25"),
+                "DEBIT",
+                "Online Grocery purchase",
+                LocalDateTime.of(2026, 8, 1, 14, 10)
+        ));
+
+        transactions.add(new Transaction(
+                "TXN-005",
+                "ACC-1001",
+                new BigDecimal("-2200.00"),
+                "DEBIT",
+                "House RENT",
+                LocalDateTime.of(2026, 8, 2, 8, 45)
+        ));
+
+        transactions.add(new Transaction(
+                "TXN-006",
+                "ACC-1002",
+                new BigDecimal("1500.75"),
+                "CREDIT",
+                "Cashback Reward",
+                LocalDateTime.of(2026, 8, 2, 10, 20)
+        ));
+
+        transactions.add(new Transaction(
+                "TXN-007",
+                "ACC-1001",
+                new BigDecimal("-499.99"),
+                "DEBIT",
+                "Streaming Subscription",
+                LocalDateTime.of(2026, 8, 2, 13, 5)
+        ));
+
+        transactions.add(new Transaction(
+                "TXN-008",
+                "ACC-1002",
+                new BigDecimal("-3000.00"),
+                "TRANSFER",
+                "Transfer to SAVINGS account",
+                LocalDateTime.of(2026, 8, 2, 15, 30)
+        ));
+
+        transactions.add(new Transaction(
+                "TXN-009",
+                "ACC-1001",
+                new BigDecimal("850.00"),
+                "REFUND",
+                "Refund for Online Purchase",
+                LocalDateTime.of(2026, 8, 2, 17, 40)
+        ));
+
+        transactions.add(new Transaction(
+                "TXN-009", // intentional duplicate ID
+                "ACC-1001",
+                new BigDecimal("850.00"),
+                "REFUND",
+                "REFUND for online purchase",
+                LocalDateTime.of(2026, 8, 2, 17, 40)
+        ));
+
+        return transactions;
+    }
+
+    public Transaction createTransaction(CreateTransactionRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException(
+                    "Transaction request is required"
+            );
+        }
+
+        if (request.id() == null || request.id().isBlank()) {
+            throw new IllegalArgumentException(
+                    "Transaction id is required"
+            );
+        }
+
+        if (request.accountId() == null || request.accountId().isBlank()) {
+            throw new IllegalArgumentException(
+                    "Account id is required"
+            );
+        }
+
+        if (request.amount() == null) {
+            throw new InvalidTransactionAmountException(
+                    "Transaction amount is required"
+            );
+        }
+
+        if (request.amount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidTransactionAmountException(
+                    "Transaction amount must be greater than zero"
+            );
+        }
+
+        if (request.type() == null || request.type().isBlank()) {
+            throw new IllegalArgumentException(
+                    "Transaction type is required"
+            );
+        }
+
+        Transaction transaction = new Transaction();
+        transaction.setId(request.id());
+        transaction.setAccountId(request.accountId());
+        transaction.setAmount(request.amount());
+        transaction.setType(request.type());
+        transaction.setDescription(request.description());
+        transaction.setTimestamp(LocalDateTime.now());
+
+        return transaction;
     }
 }
