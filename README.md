@@ -208,3 +208,4 @@ For each topic:
 ## Project Positioning
 
 This repository represents hands-on learning and career-restart preparation. Technologies are listed here only after they have been used directly in the exercises or project.
+f
