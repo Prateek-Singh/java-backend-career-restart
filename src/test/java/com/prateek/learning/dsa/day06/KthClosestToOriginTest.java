@@ -1,4 +1,4 @@
-package com.prateek.learning.dsa;
+package com.prateek.learning.dsa.day06;
 
 import org.junit.jupiter.api.Test;
 
