@@ -8,7 +8,7 @@ public class Transaction {
     private String id;
     private String accountId;
     private BigDecimal amount;
-    private String type;
+    private TransactionType type;
     private String description;
     private LocalDateTime timestamp;
 
@@ -17,7 +17,7 @@ public class Transaction {
     public Transaction() {
     }
 
-    public Transaction(String id, String accountId, BigDecimal amount, String type, String description, LocalDateTime timestamp) {
+    public Transaction(String id, String accountId, BigDecimal amount, TransactionType type, String description, LocalDateTime timestamp) {
         this.id = id;
         this.accountId = accountId;
         this.amount = amount;
@@ -50,11 +50,11 @@ public class Transaction {
         this.amount = amount;
     }
 
-    public String getType() {
+    public TransactionType getType() {
         return type;
     }
 
-    public void setType(String type) {
+    public void setType(TransactionType type) {
         this.type = type;
     }
 
@@ -92,7 +92,7 @@ public class Transaction {
                 "id='" + id + '\'' +
                 ", accountId='" + accountId + '\'' +
                 ", amount=" + amount +
-                ", type='" + type + '\'' +
+                ", type=" + type +
                 ", description='" + description + '\'' +
                 ", timestamp=" + timestamp +
                 '}';

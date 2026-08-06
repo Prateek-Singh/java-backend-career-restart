@@ -3,6 +3,7 @@ package com.prateek.learning.java.day01;
 import com.prateek.learning.transaction.exception.InvalidTransactionAmountException;
 import com.prateek.learning.transaction.exception.TransactionNotFoundException;
 import com.prateek.learning.transaction.model.Transaction;
+import com.prateek.learning.transaction.model.TransactionType;
 import com.prateek.learning.transaction.repository.InMemoryTransactionRepository;
 import com.prateek.learning.transaction.service.TransactionService;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,10 +55,10 @@ class TransactionServiceTest {
                 );
 
         assertEquals(1, result.size());
-        assertEquals("TXN-003", result.getFirst().getId());
+        assertEquals("TXN-003", result.get(0).getId());
         assertEquals(
                 "Freelance Project PAYMENT",
-                result.getFirst().getDescription()
+                result.get(0).getDescription()
         );
     }
 
@@ -77,7 +78,7 @@ class TransactionServiceTest {
         assertEquals(1, txn001Transactions.size());
         assertEquals(
                 "Monthly Salary",
-                txn001Transactions.getFirst().getDescription()
+                txn001Transactions.get(0).getDescription()
         );
 
         List<Transaction> txn009Transactions = result.stream()
@@ -87,7 +88,7 @@ class TransactionServiceTest {
         assertEquals(1, txn009Transactions.size());
         assertEquals(
                 "Refund for Online Purchase",
-                txn009Transactions.getFirst().getDescription()
+                txn009Transactions.get(0).getDescription()
         );
     }
 
@@ -233,7 +234,7 @@ class TransactionServiceTest {
                 "TXN-001",
                 "ACC-1001",
                 new BigDecimal("25000.00"),
-                "CREDIT",
+                TransactionType.CREDIT,
                 "Monthly Salary",
                 LocalDateTime.of(2026, 8, 1, 9, 30)
         ));
@@ -242,7 +243,7 @@ class TransactionServiceTest {
                 "TXN-001",
                 "ACC-1001",
                 new BigDecimal("-1250.50"),
-                "DEBIT",
+                TransactionType.DEBIT,
                 "Electricity Bill Payment",
                 LocalDateTime.of(2026, 8, 1, 11, 15)
         ));
@@ -251,7 +252,7 @@ class TransactionServiceTest {
                 "TXN-003",
                 "ACC-1002",
                 new BigDecimal("5000.00"),
-                "CREDIT",
+                TransactionType.CREDIT,
                 "Freelance Project PAYMENT",
                 LocalDateTime.of(2026, 8, 1, 12, 0)
         ));
@@ -260,7 +261,7 @@ class TransactionServiceTest {
                 "TXN-004",
                 "ACC-1002",
                 new BigDecimal("-750.25"),
-                "DEBIT",
+                TransactionType.DEBIT,
                 "Online Grocery purchase",
                 LocalDateTime.of(2026, 8, 1, 14, 10)
         ));
@@ -269,7 +270,7 @@ class TransactionServiceTest {
                 "TXN-005",
                 "ACC-1001",
                 new BigDecimal("-2200.00"),
-                "DEBIT",
+                TransactionType.DEBIT,
                 "House RENT",
                 LocalDateTime.of(2026, 8, 2, 8, 45)
         ));
@@ -278,7 +279,7 @@ class TransactionServiceTest {
                 "TXN-006",
                 "ACC-1002",
                 new BigDecimal("1500.75"),
-                "CREDIT",
+                TransactionType.CREDIT,
                 "Cashback Reward",
                 LocalDateTime.of(2026, 8, 2, 10, 20)
         ));
@@ -287,7 +288,7 @@ class TransactionServiceTest {
                 "TXN-007",
                 "ACC-1001",
                 new BigDecimal("-499.99"),
-                "DEBIT",
+                TransactionType.DEBIT,
                 "Streaming Subscription",
                 LocalDateTime.of(2026, 8, 2, 13, 5)
         ));
@@ -296,7 +297,7 @@ class TransactionServiceTest {
                 "TXN-008",
                 "ACC-1002",
                 new BigDecimal("-3000.00"),
-                "TRANSFER",
+                TransactionType.TRANSFER,
                 "Transfer to SAVINGS account",
                 LocalDateTime.of(2026, 8, 2, 15, 30)
         ));
@@ -305,7 +306,7 @@ class TransactionServiceTest {
                 "TXN-009",
                 "ACC-1001",
                 new BigDecimal("850.00"),
-                "REFUND",
+                TransactionType.REFUND,
                 "Refund for Online Purchase",
                 LocalDateTime.of(2026, 8, 2, 17, 40)
         ));
@@ -314,7 +315,7 @@ class TransactionServiceTest {
                 "TXN-009",
                 "ACC-1001",
                 new BigDecimal("850.00"),
-                "REFUND",
+                TransactionType.REFUND,
                 "REFUND for online purchase",
                 LocalDateTime.of(2026, 8, 2, 17, 40)
         ));

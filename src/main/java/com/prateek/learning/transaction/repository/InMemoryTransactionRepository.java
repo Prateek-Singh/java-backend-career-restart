@@ -4,6 +4,7 @@ import com.prateek.learning.transaction.model.Transaction;
 import org.springframework.stereotype.Repository;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -33,5 +34,22 @@ public class InMemoryTransactionRepository implements  TransactionRepository {
             throw new IllegalArgumentException("Transaction id cannot be null or empty");
         }
         return Optional.ofNullable(transactions.get(transactionId));
+    }
+
+    @Override
+    public List<Transaction> findByAccountId(String accountId) {
+        if (accountId == null || accountId.isBlank()) {
+            throw new IllegalArgumentException("Account id cannot be null or empty");
+        }
+        return transactions
+                .values()
+                .stream()
+                .filter(txn -> accountId.equals(txn.getAccountId()))
+                .toList();
+    }
+
+    @Override
+    public void clear() {
+        transactions.clear();
     }
 }

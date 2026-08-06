@@ -3,6 +3,7 @@ package com.prateek.learning.java.day01;
 import com.prateek.learning.transaction.exception.InvalidTransactionAmountException;
 import com.prateek.learning.transaction.dto.CreateTransactionRequest;
 import com.prateek.learning.transaction.model.Transaction;
+import com.prateek.learning.transaction.model.TransactionType;
 import com.prateek.learning.transaction.repository.InMemoryTransactionRepository;
 import com.prateek.learning.transaction.service.TransactionService;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.when;
 
 class TransactionServiceCreateTransactionTest {
 
@@ -36,7 +38,7 @@ class TransactionServiceCreateTransactionTest {
                 " ",
                 "ACC-111",
                 new BigDecimal("25.00"),
-                "CREDIT",
+                TransactionType.CREDIT,
                 "Monthly Savings"
         );
 
@@ -53,7 +55,7 @@ class TransactionServiceCreateTransactionTest {
                 "TXN-125",
                 " ",
                 new BigDecimal("25.00"),
-                "CREDIT",
+                TransactionType.CREDIT,
                 "Monthly Savings"
         );
 
@@ -70,7 +72,7 @@ class TransactionServiceCreateTransactionTest {
                 "TXN-125",
                 "ACC-111",
                 null,
-                "CREDIT",
+                TransactionType.CREDIT,
                 "Monthly Savings"
         );
 
@@ -87,7 +89,7 @@ class TransactionServiceCreateTransactionTest {
                 "TXN-125",
                 "ACC-111",
                 BigDecimal.ZERO,
-                "CREDIT",
+                TransactionType.CREDIT,
                 "Monthly Savings"
         );
 
@@ -104,7 +106,7 @@ class TransactionServiceCreateTransactionTest {
                 "TXN-125",
                 "ACC-111",
                 BigDecimal.valueOf(-25.00),
-                "CREDIT",
+                TransactionType.CREDIT,
                 "Monthly Savings"
         );
 
@@ -116,18 +118,19 @@ class TransactionServiceCreateTransactionTest {
     }
 
     @Test
-    void shouldThrowIllegalArgumentExceptionWhenTypeIsBlank() {
-        CreateTransactionRequest createTransactionRequest = new CreateTransactionRequest(
+    void shouldRejectTransactionWhenTypeIsBlank() {
+        CreateTransactionRequest request = new CreateTransactionRequest(
                 "TXN-125",
                 "ACC-111",
                 BigDecimal.TEN,
-                " ",
+                null,
                 "Monthly Savings"
         );
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-            transactionService.createTransaction(createTransactionRequest);
-        });
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> transactionService.createTransaction(request)
+        );
 
         assertEquals("Transaction type is required", exception.getMessage());
     }
@@ -138,7 +141,7 @@ class TransactionServiceCreateTransactionTest {
                 "TXN-125",
                 "ACC-111",
                 BigDecimal.TEN,
-                "CREDIT",
+                TransactionType.CREDIT,
                 "Monthly Savings"
         );
 
@@ -147,7 +150,7 @@ class TransactionServiceCreateTransactionTest {
         assertEquals("TXN-125", transaction.getId());
         assertEquals("ACC-111", transaction.getAccountId());
         assertEquals(BigDecimal.TEN, transaction.getAmount());
-        assertEquals("CREDIT", transaction.getType());
+        assertEquals(TransactionType.CREDIT, transaction.getType());
         assertEquals("Monthly Savings", transaction.getDescription());
         assertNotNull(transaction.getTimestamp());
         assertNotSame(createTransactionRequest, transaction);

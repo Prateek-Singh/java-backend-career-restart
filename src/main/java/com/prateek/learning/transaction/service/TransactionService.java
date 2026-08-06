@@ -4,6 +4,7 @@ import com.prateek.learning.transaction.exception.InvalidTransactionAmountExcept
 import com.prateek.learning.transaction.exception.TransactionNotFoundException;
 import com.prateek.learning.transaction.dto.CreateTransactionRequest;
 import com.prateek.learning.transaction.model.Transaction;
+import com.prateek.learning.transaction.model.TransactionType;
 import com.prateek.learning.transaction.repository.TransactionRepository;
 import org.springframework.stereotype.Service;
 
@@ -24,7 +25,7 @@ public class TransactionService {
     private final List<Transaction> transactions = createSampleTransactions();
 
     public List<Transaction> findByAccountId(String accountId) {
-        return findByAccountId(transactions, accountId);
+        return transactionRepository.findByAccountId(accountId);
     }
 
     public List<Transaction> findByAccountId(List<Transaction> transactions, String accountId) {
@@ -50,7 +51,7 @@ public class TransactionService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    public Map<String, List<Transaction>> groupByType(List<Transaction> transactions) {
+    public Map<TransactionType, List<Transaction>> groupByType(List<Transaction> transactions) {
         if (transactions == null || transactions.isEmpty()) {
             return Map.of();
         }
@@ -211,7 +212,7 @@ public class TransactionService {
                 "TXN-001",
                 "ACC-1001",
                 new BigDecimal("25000.00"),
-                "CREDIT",
+                TransactionType.CREDIT,
                 "Monthly Salary",
                 LocalDateTime.of(2026, 8, 1, 9, 30)
         ));
@@ -220,7 +221,7 @@ public class TransactionService {
                 "TXN-002",
                 "ACC-1001",
                 new BigDecimal("-1250.50"),
-                "DEBIT",
+                TransactionType.DEBIT,
                 "Electricity Bill Payment",
                 LocalDateTime.of(2026, 8, 1, 11, 15)
         ));
@@ -229,7 +230,7 @@ public class TransactionService {
                 "TXN-003",
                 "ACC-1002",
                 new BigDecimal("5000.00"),
-                "CREDIT",
+                TransactionType.CREDIT,
                 "Freelance Project PAYMENT",
                 LocalDateTime.of(2026, 8, 1, 12, 0)
         ));
@@ -238,7 +239,7 @@ public class TransactionService {
                 "TXN-004",
                 "ACC-1002",
                 new BigDecimal("-750.25"),
-                "DEBIT",
+                TransactionType.DEBIT,
                 "Online Grocery purchase",
                 LocalDateTime.of(2026, 8, 1, 14, 10)
         ));
@@ -247,7 +248,7 @@ public class TransactionService {
                 "TXN-005",
                 "ACC-1001",
                 new BigDecimal("-2200.00"),
-                "DEBIT",
+                TransactionType.DEBIT,
                 "House RENT",
                 LocalDateTime.of(2026, 8, 2, 8, 45)
         ));
@@ -256,7 +257,7 @@ public class TransactionService {
                 "TXN-006",
                 "ACC-1002",
                 new BigDecimal("1500.75"),
-                "CREDIT",
+                TransactionType.CREDIT,
                 "Cashback Reward",
                 LocalDateTime.of(2026, 8, 2, 10, 20)
         ));
@@ -265,7 +266,7 @@ public class TransactionService {
                 "TXN-007",
                 "ACC-1001",
                 new BigDecimal("-499.99"),
-                "DEBIT",
+                TransactionType.DEBIT,
                 "Streaming Subscription",
                 LocalDateTime.of(2026, 8, 2, 13, 5)
         ));
@@ -274,7 +275,7 @@ public class TransactionService {
                 "TXN-008",
                 "ACC-1002",
                 new BigDecimal("-3000.00"),
-                "TRANSFER",
+                TransactionType.TRANSFER,
                 "Transfer to SAVINGS account",
                 LocalDateTime.of(2026, 8, 2, 15, 30)
         ));
@@ -283,7 +284,7 @@ public class TransactionService {
                 "TXN-009",
                 "ACC-1001",
                 new BigDecimal("850.00"),
-                "REFUND",
+                TransactionType.REFUND,
                 "Refund for Online Purchase",
                 LocalDateTime.of(2026, 8, 2, 17, 40)
         ));
@@ -292,7 +293,7 @@ public class TransactionService {
                 "TXN-009", // intentional duplicate ID
                 "ACC-1001",
                 new BigDecimal("850.00"),
-                "REFUND",
+                TransactionType.REFUND,
                 "REFUND for online purchase",
                 LocalDateTime.of(2026, 8, 2, 17, 40)
         ));
@@ -331,7 +332,7 @@ public class TransactionService {
             );
         }
 
-        if (request.type() == null || request.type().isBlank()) {
+        if (request.type() == null) {
             throw new IllegalArgumentException(
                     "Transaction type is required"
             );

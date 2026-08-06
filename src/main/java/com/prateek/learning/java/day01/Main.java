@@ -1,6 +1,7 @@
 package com.prateek.learning.java.day01;
 
 import com.prateek.learning.transaction.model.Transaction;
+import com.prateek.learning.transaction.model.TransactionType;
 import com.prateek.learning.transaction.repository.InMemoryTransactionRepository;
 import com.prateek.learning.transaction.repository.TransactionRepository;
 import com.prateek.learning.transaction.service.TransactionService;
@@ -32,7 +33,7 @@ public class Main {
                 "TXN-001",
                 "ACC-1001",
                 new BigDecimal("25000.00"),
-                "CREDIT",
+                TransactionType.CREDIT,
                 "Monthly Salary",
                 LocalDateTime.of(2026, 8, 1, 9, 30)
         ));
@@ -41,7 +42,7 @@ public class Main {
                 "TXN-002",
                 "ACC-1001",
                 new BigDecimal("-1250.50"),
-                "DEBIT",
+                TransactionType.DEBIT,
                 "Electricity Bill Payment",
                 LocalDateTime.of(2026, 8, 1, 11, 15)
         ));
@@ -50,7 +51,7 @@ public class Main {
                 "TXN-003",
                 "ACC-1002",
                 new BigDecimal("5000.00"),
-                "CREDIT",
+                TransactionType.CREDIT,
                 "Freelance Project PAYMENT",
                 LocalDateTime.of(2026, 8, 1, 12, 0)
         ));
@@ -59,7 +60,7 @@ public class Main {
                 "TXN-004",
                 "ACC-1002",
                 new BigDecimal("-750.25"),
-                "DEBIT",
+                TransactionType.DEBIT,
                 "Online Grocery purchase",
                 LocalDateTime.of(2026, 8, 1, 14, 10)
         ));
@@ -68,7 +69,7 @@ public class Main {
                 "TXN-005",
                 "ACC-1001",
                 new BigDecimal("-2200.00"),
-                "DEBIT",
+                TransactionType.DEBIT,
                 "House RENT",
                 LocalDateTime.of(2026, 8, 2, 8, 45)
         ));
@@ -77,7 +78,7 @@ public class Main {
                 "TXN-006",
                 "ACC-1002",
                 new BigDecimal("1500.75"),
-                "CREDIT",
+                TransactionType.CREDIT,
                 "Cashback Reward",
                 LocalDateTime.of(2026, 8, 2, 10, 20)
         ));
@@ -86,7 +87,7 @@ public class Main {
                 "TXN-007",
                 "ACC-1001",
                 new BigDecimal("-499.99"),
-                "DEBIT",
+                TransactionType.DEBIT,
                 "Streaming Subscription",
                 LocalDateTime.of(2026, 8, 2, 13, 5)
         ));
@@ -95,7 +96,7 @@ public class Main {
                 "TXN-008",
                 "ACC-1002",
                 new BigDecimal("-3000.00"),
-                "TRANSFER",
+                TransactionType.TRANSFER,
                 "Transfer to SAVINGS account",
                 LocalDateTime.of(2026, 8, 2, 15, 30)
         ));
@@ -104,7 +105,7 @@ public class Main {
                 "TXN-009",
                 "ACC-1001",
                 new BigDecimal("850.00"),
-                "REFUND",
+                TransactionType.REFUND,
                 "Refund for Online Purchase",
                 LocalDateTime.of(2026, 8, 2, 17, 40)
         ));
@@ -113,7 +114,7 @@ public class Main {
                 "TXN-009", // intentional duplicate ID
                 "ACC-1001",
                 new BigDecimal("850.00"),
-                "REFUND",
+                TransactionType.REFUND,
                 "REFUND for online purchase",
                 LocalDateTime.of(2026, 8, 2, 17, 40)
         ));

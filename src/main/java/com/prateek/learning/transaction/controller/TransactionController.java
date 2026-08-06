@@ -3,6 +3,7 @@ package com.prateek.learning.transaction.controller;
 import com.prateek.learning.transaction.model.Transaction;
 import com.prateek.learning.transaction.service.TransactionService;
 import com.prateek.learning.transaction.dto.CreateTransactionRequest;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -37,7 +38,7 @@ public class TransactionController {
 
     @PostMapping
     public ResponseEntity<Transaction> createTransaction(
-            @RequestBody CreateTransactionRequest request
+            @Valid @RequestBody CreateTransactionRequest request
     ) {
         Transaction transaction =
                 transactionService.createTransaction(request);
