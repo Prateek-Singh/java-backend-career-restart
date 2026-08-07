@@ -5,6 +5,7 @@ import com.prateek.learning.transaction.model.TransactionType;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -51,7 +52,7 @@ class InMemoryTransactionRepositoryTest {
                 BigDecimal.TEN,
                 TransactionType.CREDIT,
                 "Monthly EMI",
-                LocalDateTime.now());
+                Instant.now());
 
         Transaction savedTxn = repository.save(txn);
 
@@ -72,7 +73,7 @@ class InMemoryTransactionRepositoryTest {
                 BigDecimal.TEN,
                 TransactionType.CREDIT,
                 "Monthly EMI",
-                LocalDateTime.now());
+                Instant.now());
 
         Transaction duplicate = new Transaction(
                 "Txn-111",
@@ -80,7 +81,7 @@ class InMemoryTransactionRepositoryTest {
                 BigDecimal.ONE,
                 TransactionType.DEBIT,
                 "Different transaction",
-                LocalDateTime.now()
+                Instant.now()
         );
 
         repository.save(txn);
@@ -122,7 +123,7 @@ class InMemoryTransactionRepositoryTest {
                 BigDecimal.TEN,
                 TransactionType.CREDIT,
                 "Monthly EMI",
-                LocalDateTime.now()
+                Instant.now()
         );
 
         Transaction savedTransaction = repository.save(transaction);
@@ -142,7 +143,7 @@ class InMemoryTransactionRepositoryTest {
                 BigDecimal.TEN,
                 TransactionType.CREDIT,
                 "Monthly EMI",
-                LocalDateTime.now()
+                Instant.now()
         );
 
         Transaction transaction2 = new Transaction(
@@ -151,7 +152,7 @@ class InMemoryTransactionRepositoryTest {
                 BigDecimal.TEN,
                 TransactionType.CREDIT,
                 "Monthly EMI",
-                LocalDateTime.now()
+                Instant.now()
         );
 
         repository.save(transaction1);
@@ -172,7 +173,7 @@ class InMemoryTransactionRepositoryTest {
                 BigDecimal.TEN,
                 TransactionType.CREDIT,
                 "Monthly EMI",
-                LocalDateTime.now()
+                Instant.now()
         );
 
         Transaction transaction2 = new Transaction(
@@ -181,7 +182,7 @@ class InMemoryTransactionRepositoryTest {
                 BigDecimal.TEN,
                 TransactionType.CREDIT,
                 "Monthly EMI",
-                LocalDateTime.now()
+                Instant.now()
         );
 
         repository.save(transaction1);
@@ -215,7 +216,7 @@ class InMemoryTransactionRepositoryTest {
                 BigDecimal.TEN,
                 TransactionType.CREDIT,
                 "Monthly EMI",
-                LocalDateTime.now()
+                Instant.now()
         );
 
         Transaction transaction2 = new Transaction(
@@ -224,7 +225,7 @@ class InMemoryTransactionRepositoryTest {
                 BigDecimal.TEN,
                 TransactionType.CREDIT,
                 "Monthly EMI",
-                LocalDateTime.now()
+                Instant.now()
         );
 
         repository.save(transaction1);
@@ -246,7 +247,7 @@ class InMemoryTransactionRepositoryTest {
                 BigDecimal.TEN,
                 TransactionType.CREDIT,
                 "Monthly EMI",
-                LocalDateTime.now()
+                Instant.now()
         );
 
         Transaction transaction2 = new Transaction(
@@ -255,7 +256,7 @@ class InMemoryTransactionRepositoryTest {
                 BigDecimal.TEN,
                 TransactionType.CREDIT,
                 "Monthly EMI",
-                LocalDateTime.now()
+                Instant.now()
         );
 
         repository.save(transaction1);

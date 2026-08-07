@@ -2,7 +2,7 @@
 
 This repository documents my structured return to hands-on Java backend engineering.
 
-It contains progressive exercises and a small Spring Boot API used to rebuild practical confidence in Java, testing, data structures and algorithms, SQL, REST API development, and backend design.
+It contains progressive exercises and a Spring Boot transaction API used to rebuild practical confidence in Java, testing, data structures and algorithms, SQL, REST API development, persistence, database migrations, and backend design.
 
 ## Current Focus
 
@@ -14,9 +14,13 @@ It contains progressive exercises and a small Spring Boot API used to rebuild pr
 - Jakarta Bean Validation
 - MockMvc controller-slice testing
 - Spring Boot integration testing
+- Spring Data JPA
+- Relational persistence with MySQL
+- Flyway database migrations
 - Data structures and algorithms
 - SQL aggregation, joins, subqueries, and window functions
 - Backend layering and repository design
+- Idempotency and transaction-processing design
 - System design and interview preparation
 
 ## Tech Stack Used in This Repository
@@ -25,13 +29,19 @@ It contains progressive exercises and a small Spring Boot API used to rebuild pr
 - Maven
 - Spring Boot
 - Spring MVC
+- Spring Data JPA
 - Jakarta Bean Validation
+- MySQL
+- H2
+- Flyway
+- Docker
+- Docker Compose
 - JUnit 5
 - Mockito
 - MockMvc
 - Git
 
-Additional technologies will be added only after they are used in hands-on exercises or projects.
+Additional technologies are added only after they are used directly in hands-on exercises or project work.
 
 ## Current REST Endpoints
 
@@ -55,7 +65,7 @@ GET /transactions/account/{accountId}
 
 Returns:
 
-- `200 OK` with matching persisted transactions
+- `200 OK` with matching transactions
 - `200 OK` with an empty JSON array when there are no matches
 
 The endpoint currently makes no ordering guarantee.
@@ -84,7 +94,12 @@ Returns:
 - `201 Created` for a valid request
 - `400 Bad Request` for invalid input, malformed JSON, or an unsupported transaction type
 
-Created transactions are stored through an in-memory repository and can be retrieved through the GET endpoints during the application lifecycle.
+Transactions are persisted through a `TransactionRepository` abstraction.
+
+The active repository implementation depends on the Spring profile:
+
+- `in-memory` uses the in-memory repository
+- `jpa` uses the JPA-backed repository adapter
 
 ## Validation and Domain Rules
 
@@ -106,7 +121,7 @@ Important business invariants are also enforced in the service layer so non-HTTP
 - amount must be positive
 - transaction type is required
 
-Description is currently enforced at the HTTP request boundary and is not yet treated as a service-level business invariant.
+Description is currently enforced at the HTTP request boundary and is not treated as a service-level business invariant.
 
 Supported transaction types are represented by an enum:
 
@@ -147,35 +162,281 @@ Illustrative validation response:
 }
 ```
 
+## Persistence Architecture
+
+The service depends on an application-facing repository abstraction rather than Spring Data directly.
+
+```text
+TransactionController
+        |
+        v
+TransactionService
+        |
+        v
+TransactionRepository
+        |
+        v
+JpaTransactionRepositoryAdapter
+        |
+        +--> TransactionEntityMapper
+        |
+        v
+SpringDataTransactionRepository
+        |
+        v
+MySQL
+```
+
+The persistence implementation keeps the domain model separate from JPA-specific concerns.
+
+### Domain model
+
+`Transaction` represents the application/domain view of a transaction.
+
+### Persistence entity
+
+`TransactionEntity` represents the relational persistence model.
+
+Important persistence choices:
+
+- internal UUID primary key
+- unique business `transactionId`
+- `BigDecimal` mapped to `DECIMAL(19,2)`
+- enum stored using string representation
+- `Instant` used for transaction timestamps
+- nullable description
+
+The UUID primary key is persistence-specific, while `transactionId` remains the business and idempotency identifier.
+
+## Repository Implementations
+
+The project currently has two implementations of `TransactionRepository`.
+
+### In-memory implementation
+
+Used with:
+
+```text
+in-memory
+```
+
+This supports lightweight application and test scenarios without requiring a database.
+
+### JPA implementation
+
+Used with:
+
+```text
+jpa
+```
+
+The JPA implementation consists of:
+
+- `JpaTransactionRepositoryAdapter`
+- `TransactionEntityMapper`
+- `TransactionEntity`
+- `SpringDataTransactionRepository`
+
+Spring profiles are used so only one repository implementation is active at a time.
+
+## Database and Schema Management
+
+MySQL is used for the real relational persistence path.
+
+Flyway owns database schema creation and evolution.
+
+Migration scripts are stored under:
+
+```text
+src/main/resources/db/migration
+```
+
+The initial migration is:
+
+```text
+V1__create_transactions_table.sql
+```
+
+Flyway maintains migration history in:
+
+```text
+flyway_schema_history
+```
+
+Hibernate is configured with:
+
+```yaml
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+```
+
+This means:
+
+```text
+Flyway
+→ creates and changes the schema
+
+Hibernate
+→ validates that entity mappings match the schema
+```
+
+Hibernate does not own schema evolution.
+
+Open Session in View is disabled:
+
+```yaml
+spring:
+  jpa:
+    open-in-view: false
+```
+
+## Database Configuration
+
+Runtime database values are read from environment variables rather than being stored directly in application configuration.
+
+Required variables:
+
+```text
+DB_URL
+DB_USERNAME
+DB_PASSWORD
+```
+
+Example local values:
+
+```bash
+export DB_URL="jdbc:mysql://localhost:3306/transaction_db"
+export DB_USERNAME="app_user"
+export DB_PASSWORD="app_password"
+```
+
+The `jpa` runtime profile reads these values through Spring configuration.
+
+JPA integration tests use H2 through test-specific configuration, so MySQL is not required for the normal Maven test suite.
+
+## Running MySQL with Docker
+
+MySQL can be run locally through Docker Compose.
+
+Start the container:
+
+```bash
+docker compose up -d
+```
+
+Check status:
+
+```bash
+docker compose ps
+```
+
+Stop the container while keeping its data:
+
+```bash
+docker compose stop
+```
+
+Start the existing container again:
+
+```bash
+docker compose start
+```
+
+Avoid:
+
+```bash
+docker compose down -v
+```
+
+unless the local database volume should intentionally be deleted.
+
+## Running the Project
+
+### Run all tests
+
+```bash
+mvn clean test
+```
+
+### Run using the in-memory repository
+
+Activate the `in-memory` profile when required by the local setup.
+
+### Run using MySQL/JPA
+
+Ensure MySQL is running and database environment variables have been exported.
+
+Then start the application with:
+
+```bash
+mvn spring-boot:run -Dspring-boot.run.profiles=jpa
+```
+
+The application runs on the default Spring Boot port:
+
+```text
+http://localhost:8080
+```
+
+On startup with the JPA profile:
+
+1. Flyway validates migration history.
+2. Flyway applies any pending migrations.
+3. Hibernate validates the entity mappings against the database schema.
+4. Spring Boot starts the REST application.
+
 ## Repository Structure
 
 ```text
 src/
-├── main/java/com/prateek/learning/
-│   ├── CareerRestartApplication.java
-│   ├── common/exception/
-│   ├── dsa/
-│   │   ├── day01/
-│   │   ├── day02/
-│   │   ├── day03/
-│   │   ├── day04/
-│   │   ├── day05/
-│   │   └── day06/
-│   ├── java/
-│   │   ├── day01/
-│   │   ├── day02/
-│   │   └── day03/
-│   └── transaction/
-│       ├── controller/
-│       ├── dto/
-│       ├── exception/
-│       ├── model/
-│       ├── repository/
-│       └── service/
-└── test/java/com/prateek/learning/
-    ├── dsa/
-    ├── java/
-    └── transaction/
+├── main/
+│   ├── java/com/prateek/learning/
+│   │   ├── CareerRestartApplication.java
+│   │   ├── common/
+│   │   │   └── exception/
+│   │   ├── dsa/
+│   │   │   ├── day01/
+│   │   │   ├── day02/
+│   │   │   ├── day03/
+│   │   │   ├── day04/
+│   │   │   ├── day05/
+│   │   │   ├── day06/
+│   │   │   └── day07/
+│   │   ├── java/
+│   │   │   ├── day01/
+│   │   │   ├── day02/
+│   │   │   └── day03/
+│   │   └── transaction/
+│   │       ├── controller/
+│   │       ├── dto/
+│   │       ├── exception/
+│   │       ├── model/
+│   │       ├── repository/
+│   │       ├── service/
+│   │       └── persistence/
+│   │           ├── adapter/
+│   │           ├── entity/
+│   │           ├── mapper/
+│   │           └── repository/
+│   └── resources/
+│       ├── application-jpa.yml
+│       └── db/
+│           └── migration/
+│               └── V1__create_transactions_table.sql
+│
+└── test/
+    ├── java/com/prateek/learning/
+    │   ├── dsa/
+    │   ├── java/
+    │   └── transaction/
+    │       ├── controller/
+    │       ├── service/
+    │       └── persistence/
+    │           └── adapter/
+    └── resources/
+        └── application-jpa.yml
 
 notes/
 ├── day-01.md
@@ -183,8 +444,36 @@ notes/
 ├── day-03.md
 ├── day-04.md
 ├── day-05.md
-└── day-06.md
+├── day-06.md
+└── day-07.md
 ```
+
+## Testing Approach
+
+The project separates tests by responsibility.
+
+- **Repository unit tests** verify repository contracts and lookup behaviour.
+- **Service unit tests** verify business rules and repository delegation.
+- **Controller-slice tests** use `@WebMvcTest`, `MockMvc`, and a mocked service.
+- **Application integration tests** verify request-to-repository behaviour through the Spring context.
+- **JPA integration tests** verify the adapter, mapper, Spring Data repository, and relational persistence path using H2.
+- **Exception-handler tests** verify structured API error responses.
+- **DSA tests** cover happy paths, edge cases, invalid input, duplicates, ties, and ordering assumptions.
+
+Invalid HTTP requests are tested to confirm that:
+
+- `400 Bad Request` is returned
+- the expected validation message is included
+- the service layer is not called
+
+The JPA integration tests verify:
+
+- saving transactions
+- retrieving a transaction by business transaction ID
+- retrieving transactions by account ID
+- domain-to-entity mapping
+- entity-to-domain mapping
+- database-backed round trips
 
 ## Progress Summary
 
@@ -244,42 +533,27 @@ notes/
 - Implemented K Closest Points to Origin using a size-limited max-heap
 - Practised SQL aggregation using `WHERE`, `GROUP BY`, `HAVING`, `ORDER BY`, and `LIMIT`
 
-## Running the Project
+### Day 7
 
-Run all tests:
-
-```bash
-mvn clean test
-```
-
-Start the Spring Boot application:
-
-```bash
-mvn spring-boot:run
-```
-
-The application runs on the default Spring Boot port:
-
-```text
-http://localhost:8080
-```
-
-## Testing Approach
-
-The project separates tests by responsibility:
-
-- **Repository unit tests** verify persistence contracts and lookup behaviour.
-- **Service unit tests** verify business rules and repository delegation.
-- **Controller-slice tests** use `@WebMvcTest`, `MockMvc`, and a mocked service.
-- **Integration tests** verify request-to-repository behaviour through the Spring application context.
-- **Exception-handler tests** verify structured API error responses.
-- **DSA tests** cover happy paths, edge cases, invalid input, duplicates, ties, and ordering assumptions.
-
-Invalid HTTP requests are tested to confirm that:
-
-- `400 Bad Request` is returned
-- the expected validation message is included
-- the service layer is not called
+- Refactored duplicated service validation into focused private methods
+- Removed obsolete sample transaction state from the service
+- Reviewed layered validation across REST, Kafka, scheduled jobs, and internal callers
+- Reviewed retry, acknowledgement, idempotency, and database uniqueness behaviour
+- Implemented K Largest Elements using a bounded min-heap
+- Practised SQL aggregation with `WHERE`, `GROUP BY`, `HAVING`, and `ORDER BY`
+- Added Spring Data JPA
+- Added a dedicated persistence entity separate from the domain model
+- Added domain-to-entity and entity-to-domain mapping
+- Added a JPA repository adapter behind the existing `TransactionRepository` abstraction
+- Added profile-based selection between in-memory and JPA repositories
+- Migrated transaction timestamps from `LocalDateTime` to `Instant`
+- Added H2-backed JPA integration tests
+- Added local MySQL through Docker Compose
+- Moved runtime database credentials to environment variables
+- Added Flyway and the first versioned migration
+- Switched Hibernate from schema updates to schema validation
+- Disabled Open Session in View
+- Verified Flyway migration history and MySQL-backed application startup
 
 ## Learning Approach
 
@@ -295,18 +569,22 @@ For each topic:
 
 ## Next Planned Improvements
 
-- Complete the Day 7 review and refactoring checkpoint
-- Refactor duplicated service validation without changing behaviour
-- Review test names and remove redundant or implementation-detail assertions
-- Add Spring Data JPA
-- Replace the in-memory repository with a relational database-backed implementation
-- Add database integration tests
-- Define duplicate transaction ID behaviour explicitly
-- Improve validation responses to report multiple field errors when useful
-- Continue SQL practice with joins, subqueries, and database-backed exercises
-- Continue DSA practice with heap, map, and sorting patterns
+- Add database-backed integration testing against MySQL where it provides value
+- Review the current Flyway version against MySQL 8.4 compatibility
+- Define duplicate transaction ID behaviour at the service/API level
+- Handle database unique-constraint violations explicitly
+- Continue SQL practice using the relational transaction schema
+- Add Docker support for the Spring Boot application
+- Expand Docker Compose to run the application and database together
+- Continue DSA practice with heap, map, sorting, and interval patterns
+- Continue system-design exercises around transaction processing and idempotency
+- Add Redis with a concrete caching use case
+- Add Kafka with a concrete transaction-processing use case
 - Add API documentation
+- Add observability and production-style logging incrementally
 
 ## Project Positioning
 
-This repository represents hands-on learning and career-restart preparation. Technologies are listed here only after they have been used directly in the exercises or project.
+This repository represents hands-on learning and career-restart preparation.
+
+Technologies are listed here only after they have been used directly in exercises or project work. Current Java 21, JPA, MySQL, Flyway, Docker, and related work in this repository represents hands-on project practice and is kept distinct from professional experience.

@@ -1,6 +1,7 @@
 package com.prateek.learning.transaction.repository;
 
 import com.prateek.learning.transaction.model.Transaction;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 
 import java.util.HashMap;
@@ -9,6 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 
 @Repository
+@Profile("in-memory")
 public class InMemoryTransactionRepository implements  TransactionRepository {
 
     private final Map<String, Transaction> transactions = new HashMap<>();

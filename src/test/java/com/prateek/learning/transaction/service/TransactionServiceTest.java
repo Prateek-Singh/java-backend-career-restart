@@ -12,8 +12,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
-import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -31,7 +31,7 @@ class TransactionServiceTest {
     private TransactionRepository transactionRepository;
 
     @Test
-    void shouldSaveAndReturnTransactionWhenValid() {
+    void shouldSaveMappedTransactionAndReturnRepositoryResultWhenRequestIsValid() {
 
         BigDecimal amount = new BigDecimal("25.00");
 
@@ -43,10 +43,12 @@ class TransactionServiceTest {
                 "Monthly EMI"
         );
 
-        when(transactionRepository.save(any(Transaction.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+        Transaction repositoryResult = new Transaction();
 
-        Transaction savedTxn = transactionService.createTransaction(request);
+        when(transactionRepository.save(any(Transaction.class)))
+                .thenReturn(repositoryResult);
+
+        Transaction result = transactionService.createTransaction(request);
 
         ArgumentCaptor<Transaction> captor = ArgumentCaptor.forClass(Transaction.class);
 
@@ -60,18 +62,18 @@ class TransactionServiceTest {
         assertEquals(request.type(), transaction.getType());
         assertEquals(request.description(), transaction.getDescription());
         assertNotNull(transaction.getTimestamp());
-        assertSame(savedTxn, transaction);
+        assertSame(repositoryResult, result);
     }
 
     @Test
-    void shouldReturnTransactionsByAccountId() {
+    void shouldReturnRepositoryTransactionsWhenAccountIdMatches() {
         Transaction transaction1 = new Transaction(
                 "Txn-111",
                 "ACC-111",
                 BigDecimal.TEN,
                 TransactionType.CREDIT,
                 "Monthly EMI",
-                LocalDateTime.now()
+                Instant.now()
         );
 
         Transaction transaction2 = new Transaction(
@@ -80,7 +82,7 @@ class TransactionServiceTest {
                 BigDecimal.TEN,
                 TransactionType.CREDIT,
                 "Monthly EMI",
-                LocalDateTime.now()
+                Instant.now()
         );
 
         List<Transaction> repositoryResult = List.of(
@@ -101,8 +103,8 @@ class TransactionServiceTest {
     }
 
     @Test
-    void shouldReturnEmptyTransactionsByAccountId() {
-        List<Transaction> repositoryResult = Collections.emptyList();
+    void shouldReturnEmptyListWhenRepositoryFindsNoTransactions() {
+        List<Transaction> repositoryResult = List.of();
 
         when(transactionRepository.findByAccountId("ACC-111"))
                 .thenReturn(repositoryResult);

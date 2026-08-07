@@ -1,6 +1,5 @@
 package com.prateek.learning.java.day01;
 
-import com.prateek.learning.transaction.exception.InvalidTransactionAmountException;
 import com.prateek.learning.transaction.exception.TransactionNotFoundException;
 import com.prateek.learning.transaction.model.Transaction;
 import com.prateek.learning.transaction.model.TransactionType;
@@ -10,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,19 +17,19 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class TransactionServiceTest {
+class TransactionAnalyticsTest {
 
-    private TransactionService transactionService;
+    private TransactionAnalytics transactionAnalytics;
 
     @BeforeEach
     void setUp() {
-        transactionService = new TransactionService(new InMemoryTransactionRepository());
+        transactionAnalytics = new TransactionAnalytics();
     }
 
     @Test
     void shouldReturnEmptyWhenTransactionsAreNull() {
         assertTrue(
-                transactionService
+                transactionAnalytics
                         .findByAccountId(null, "ACC-1001")
                         .isEmpty()
         );
@@ -41,7 +41,7 @@ class TransactionServiceTest {
         List<Transaction> transactions = List.of(transaction);
 
         BigDecimal result =
-                transactionService.calculateTotalAmount(transactions);
+                transactionAnalytics.calculateTotalAmount(transactions);
 
         assertEquals(BigDecimal.ZERO, result);
     }
@@ -49,7 +49,7 @@ class TransactionServiceTest {
     @Test
     void shouldFindDescriptionUsingCaseInsensitivePartialKeyword() {
         List<Transaction> result =
-                transactionService.findByDescriptionKeyword(
+                transactionAnalytics.findByDescriptionKeyword(
                         createSampleTransactions(),
                         "freelance project"
                 );
@@ -65,7 +65,7 @@ class TransactionServiceTest {
     @Test
     void shouldKeepFirstTransactionWhenIdsAreDuplicated() {
         List<Transaction> result =
-                transactionService.removeDuplicatesById(
+                transactionAnalytics.removeDuplicatesById(
                         createSampleTransactions()
                 );
 
@@ -95,7 +95,7 @@ class TransactionServiceTest {
     @Test
     void shouldCalculateTotalAmount() {
         BigDecimal result =
-                transactionService.calculateTotalAmount(
+                transactionAnalytics.calculateTotalAmount(
                         createSampleTransactions()
                 );
 
@@ -108,7 +108,7 @@ class TransactionServiceTest {
     @Test
     void shouldCalculateTotalAmountPerAccount() {
         Map<String, BigDecimal> result =
-                transactionService.calculateTotalAmountPerAccount(
+                transactionAnalytics.calculateTotalAmountPerAccount(
                         createSampleTransactions()
                 );
 
@@ -131,17 +131,17 @@ class TransactionServiceTest {
     void shouldThrowIllegalArgumentExceptionForBlankTransactionId() {
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> transactionService.findById(createSampleTransactions(), "")
+                () -> transactionAnalytics.findById(createSampleTransactions(), "")
         );
 
-        assertEquals("Transaction ID is required", exception.getMessage());
+        assertEquals("Transaction id is required", exception.getMessage());
     }
 
     @Test
     void shouldThrowTransactionNotFoundExceptionForNullTransactions() {
         TransactionNotFoundException exception = assertThrows(
                 TransactionNotFoundException.class,
-                () -> transactionService.findById(null, "TXN-001")
+                () -> transactionAnalytics.findById(null, "TXN-001")
         );
 
         assertEquals(
@@ -154,7 +154,7 @@ class TransactionServiceTest {
     void shouldThrowTransactionNotFoundExceptionForMissingTransactionId() {
         TransactionNotFoundException exception = assertThrows(
                 TransactionNotFoundException.class,
-                () -> transactionService.findById(
+                () -> transactionAnalytics.findById(
                         createSampleTransactions(),
                         "TXN-0015"
                 )
@@ -167,58 +167,8 @@ class TransactionServiceTest {
     }
 
     @Test
-    void shouldThrowInvalidTransactionAmountExceptionForNullAmount() {
-        InvalidTransactionAmountException exception = assertThrows(
-                InvalidTransactionAmountException.class,
-                () -> transactionService.validateAmount(null)
-        );
-
-        assertEquals(
-                "Transaction amount is required",
-                exception.getMessage()
-        );
-    }
-
-    @Test
-    void shouldThrowInvalidTransactionAmountExceptionForZeroAmount() {
-        InvalidTransactionAmountException exception = assertThrows(
-                InvalidTransactionAmountException.class,
-                () -> transactionService.validateAmount(BigDecimal.ZERO)
-        );
-
-        assertEquals(
-                "Transaction amount must be greater than zero",
-                exception.getMessage()
-        );
-    }
-
-    @Test
-    void shouldThrowInvalidTransactionAmountExceptionForNegativeAmount() {
-        InvalidTransactionAmountException exception = assertThrows(
-                InvalidTransactionAmountException.class,
-                () -> transactionService.validateAmount(
-                        new BigDecimal("-15.00")
-                )
-        );
-
-        assertEquals(
-                "Transaction amount must be greater than zero",
-                exception.getMessage()
-        );
-    }
-
-    @Test
-    void shouldNotThrowExceptionForPositiveAmount() {
-        assertDoesNotThrow(
-                () -> transactionService.validateAmount(
-                        new BigDecimal("15.00")
-                )
-        );
-    }
-
-    @Test
     void shouldReturnExistingTransaction() {
-        Transaction transaction = transactionService.findById(
+        Transaction transaction = transactionAnalytics.findById(
                 createSampleTransactions(),
                 "TXN-001"
         );
@@ -236,7 +186,7 @@ class TransactionServiceTest {
                 new BigDecimal("25000.00"),
                 TransactionType.CREDIT,
                 "Monthly Salary",
-                LocalDateTime.of(2026, 8, 1, 9, 30)
+                Instant.now()
         ));
 
         transactions.add(new Transaction(
@@ -245,7 +195,7 @@ class TransactionServiceTest {
                 new BigDecimal("-1250.50"),
                 TransactionType.DEBIT,
                 "Electricity Bill Payment",
-                LocalDateTime.of(2026, 8, 1, 11, 15)
+                Instant.now()
         ));
 
         transactions.add(new Transaction(
@@ -254,7 +204,7 @@ class TransactionServiceTest {
                 new BigDecimal("5000.00"),
                 TransactionType.CREDIT,
                 "Freelance Project PAYMENT",
-                LocalDateTime.of(2026, 8, 1, 12, 0)
+                Instant.now()
         ));
 
         transactions.add(new Transaction(
@@ -263,7 +213,7 @@ class TransactionServiceTest {
                 new BigDecimal("-750.25"),
                 TransactionType.DEBIT,
                 "Online Grocery purchase",
-                LocalDateTime.of(2026, 8, 1, 14, 10)
+                Instant.now()
         ));
 
         transactions.add(new Transaction(
@@ -272,7 +222,7 @@ class TransactionServiceTest {
                 new BigDecimal("-2200.00"),
                 TransactionType.DEBIT,
                 "House RENT",
-                LocalDateTime.of(2026, 8, 2, 8, 45)
+                Instant.now()
         ));
 
         transactions.add(new Transaction(
@@ -281,7 +231,7 @@ class TransactionServiceTest {
                 new BigDecimal("1500.75"),
                 TransactionType.CREDIT,
                 "Cashback Reward",
-                LocalDateTime.of(2026, 8, 2, 10, 20)
+                Instant.now()
         ));
 
         transactions.add(new Transaction(
@@ -290,7 +240,7 @@ class TransactionServiceTest {
                 new BigDecimal("-499.99"),
                 TransactionType.DEBIT,
                 "Streaming Subscription",
-                LocalDateTime.of(2026, 8, 2, 13, 5)
+                Instant.now()
         ));
 
         transactions.add(new Transaction(
@@ -299,7 +249,7 @@ class TransactionServiceTest {
                 new BigDecimal("-3000.00"),
                 TransactionType.TRANSFER,
                 "Transfer to SAVINGS account",
-                LocalDateTime.of(2026, 8, 2, 15, 30)
+                Instant.now()
         ));
 
         transactions.add(new Transaction(
@@ -308,7 +258,7 @@ class TransactionServiceTest {
                 new BigDecimal("850.00"),
                 TransactionType.REFUND,
                 "Refund for Online Purchase",
-                LocalDateTime.of(2026, 8, 2, 17, 40)
+                Instant.now()
         ));
 
         transactions.add(new Transaction(
@@ -317,7 +267,7 @@ class TransactionServiceTest {
                 new BigDecimal("850.00"),
                 TransactionType.REFUND,
                 "REFUND for online purchase",
-                LocalDateTime.of(2026, 8, 2, 17, 40)
+                Instant.now()
         ));
 
         return transactions;

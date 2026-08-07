@@ -7,22 +7,22 @@ import com.prateek.learning.transaction.repository.TransactionRepository;
 import com.prateek.learning.transaction.service.TransactionService;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 public class Main {
     public static void main(String[] args) {
-        TransactionRepository repository = new InMemoryTransactionRepository();
-        TransactionService transactionService = new TransactionService(repository);
+        TransactionAnalytics transactionAnalytics = new TransactionAnalytics();
 
         List<Transaction> transactions = createSampleTransactions();
         List<Transaction> emptyTransactions = List.of();
 
-        BigDecimal calculateTotalAmount = transactionService.calculateTotalAmount(transactions);
+        BigDecimal calculateTotalAmount = transactionAnalytics.calculateTotalAmount(transactions);
         System.out.println("Total amount: " + calculateTotalAmount);
 
-        List<Transaction> transaction = transactionService.findByAccountId(transactions, "ACC-1001");
+        List<Transaction> transaction = transactionAnalytics.findByAccountId(transactions, "ACC-1001");
         System.out.println("Transaction Id: " + transaction.get(0).getId() + " Id : " + transaction.get(1).getId());
     }
 
@@ -35,7 +35,7 @@ public class Main {
                 new BigDecimal("25000.00"),
                 TransactionType.CREDIT,
                 "Monthly Salary",
-                LocalDateTime.of(2026, 8, 1, 9, 30)
+                Instant.now()
         ));
 
         transactions.add(new Transaction(
@@ -44,7 +44,7 @@ public class Main {
                 new BigDecimal("-1250.50"),
                 TransactionType.DEBIT,
                 "Electricity Bill Payment",
-                LocalDateTime.of(2026, 8, 1, 11, 15)
+                Instant.now()
         ));
 
         transactions.add(new Transaction(
@@ -53,7 +53,7 @@ public class Main {
                 new BigDecimal("5000.00"),
                 TransactionType.CREDIT,
                 "Freelance Project PAYMENT",
-                LocalDateTime.of(2026, 8, 1, 12, 0)
+                Instant.now()
         ));
 
         transactions.add(new Transaction(
@@ -62,7 +62,7 @@ public class Main {
                 new BigDecimal("-750.25"),
                 TransactionType.DEBIT,
                 "Online Grocery purchase",
-                LocalDateTime.of(2026, 8, 1, 14, 10)
+                Instant.now()
         ));
 
         transactions.add(new Transaction(
@@ -71,7 +71,7 @@ public class Main {
                 new BigDecimal("-2200.00"),
                 TransactionType.DEBIT,
                 "House RENT",
-                LocalDateTime.of(2026, 8, 2, 8, 45)
+                Instant.now()
         ));
 
         transactions.add(new Transaction(
@@ -80,7 +80,7 @@ public class Main {
                 new BigDecimal("1500.75"),
                 TransactionType.CREDIT,
                 "Cashback Reward",
-                LocalDateTime.of(2026, 8, 2, 10, 20)
+                Instant.now()
         ));
 
         transactions.add(new Transaction(
@@ -89,7 +89,7 @@ public class Main {
                 new BigDecimal("-499.99"),
                 TransactionType.DEBIT,
                 "Streaming Subscription",
-                LocalDateTime.of(2026, 8, 2, 13, 5)
+                Instant.now()
         ));
 
         transactions.add(new Transaction(
@@ -98,7 +98,7 @@ public class Main {
                 new BigDecimal("-3000.00"),
                 TransactionType.TRANSFER,
                 "Transfer to SAVINGS account",
-                LocalDateTime.of(2026, 8, 2, 15, 30)
+                Instant.now()
         ));
 
         transactions.add(new Transaction(
@@ -107,7 +107,7 @@ public class Main {
                 new BigDecimal("850.00"),
                 TransactionType.REFUND,
                 "Refund for Online Purchase",
-                LocalDateTime.of(2026, 8, 2, 17, 40)
+                Instant.now()
         ));
 
         transactions.add(new Transaction(
@@ -116,7 +116,7 @@ public class Main {
                 new BigDecimal("850.00"),
                 TransactionType.REFUND,
                 "REFUND for online purchase",
-                LocalDateTime.of(2026, 8, 2, 17, 40)
+                Instant.now()
         ));
 
         return transactions;

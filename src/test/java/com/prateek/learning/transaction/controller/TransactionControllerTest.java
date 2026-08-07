@@ -17,6 +17,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -48,7 +49,7 @@ class TransactionControllerTest {
                 new BigDecimal("25000.00"),
                 TransactionType.CREDIT,
                 "Monthly Salary",
-                LocalDateTime.of(2026, 8, 1, 9, 30)
+                Instant.now()
         );
 
         when(transactionService.getTransactionById("TXN-001"))
@@ -92,7 +93,7 @@ class TransactionControllerTest {
                         new BigDecimal("25000.00"),
                         TransactionType.CREDIT,
                         "Monthly Salary",
-                        LocalDateTime.of(2026, 8, 1, 9, 30)
+                        Instant.now()
                 ),
                 new Transaction(
                         "TXN-002",
@@ -100,7 +101,7 @@ class TransactionControllerTest {
                         new BigDecimal("-1250.50"),
                         TransactionType.DEBIT,
                         "Electricity Bill Payment",
-                        LocalDateTime.of(2026, 8, 1, 11, 15)
+                        Instant.now()
                 )
         );
 
@@ -146,7 +147,7 @@ class TransactionControllerTest {
                 new BigDecimal("35000.00"),
                 TransactionType.TRANSFER,
                 "Monthly EMI",
-                LocalDateTime.of(2026, 8, 4, 10, 30)
+                Instant.now()
         );
 
         when(transactionService.createTransaction(request))
