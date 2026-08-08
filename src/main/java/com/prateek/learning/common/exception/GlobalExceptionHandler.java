@@ -2,7 +2,6 @@ package com.prateek.learning.common.exception;
 
 import com.prateek.learning.transaction.exception.InvalidTransactionAmountException;
 import com.prateek.learning.transaction.exception.TransactionNotFoundException;
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -10,8 +9,6 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-
-import java.time.LocalDateTime;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -63,8 +60,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> handleValidationException(
-            MethodArgumentNotValidException exception,
-            HttpServletRequest request
+            MethodArgumentNotValidException exception
     ) {
         String message = exception.getBindingResult()
                 .getFieldErrors()
@@ -86,8 +82,6 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiError> handleHttpMessageNotReadable(
-            HttpMessageNotReadableException exception,
-            HttpServletRequest request
     ) {
         ApiError apiError = new ApiError(
                 HttpStatus.BAD_REQUEST.value(),

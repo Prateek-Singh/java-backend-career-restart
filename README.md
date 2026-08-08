@@ -154,11 +154,9 @@ Illustrative validation response:
 
 ```json
 {
-  "timestamp": "2026-08-06T10:30:00",
   "status": 400,
   "error": "Bad Request",
-  "message": "accountId cannot be null or blank",
-  "path": "/transactions"
+  "message": "accountId cannot be null or blank"
 }
 ```
 
@@ -316,14 +314,28 @@ The `jpa` runtime profile reads these values through Spring configuration.
 
 JPA integration tests use H2 through test-specific configuration, so MySQL is not required for the normal Maven test suite.
 
-## Running MySQL with Docker
+## Running the Application and MySQL with Docker Compose
 
-MySQL can be run locally through Docker Compose.
+The repository includes a multi-stage `Dockerfile` for the Spring Boot application and a root-level `compose.yml` that runs the application together with MySQL 8.4.
 
-Start the container:
+The application container connects to MySQL through Docker Compose service discovery using the service name `mysql`:
+
+```text
+jdbc:mysql://mysql:3306/transaction_db
+```
+
+Inside a container, `localhost` refers to that same container, so the Compose service name is used instead of `localhost` for application-to-database traffic.
+
+Build and start the full stack:
 
 ```bash
-docker compose up -d
+docker compose up --build
+```
+
+Run in detached mode when startup logs do not need to remain attached:
+
+```bash
+docker compose up --build -d
 ```
 
 Check status:
@@ -332,25 +344,27 @@ Check status:
 docker compose ps
 ```
 
-Stop the container while keeping its data:
+Stop both containers while preserving the MySQL volume:
 
 ```bash
 docker compose stop
 ```
 
-Start the existing container again:
+Start the existing containers again:
 
 ```bash
 docker compose start
 ```
 
-Avoid:
+The MySQL named volume preserves transaction data across `stop` / `start` cycles. Avoid:
 
 ```bash
 docker compose down -v
 ```
 
 unless the local database volume should intentionally be deleted.
+
+`depends_on` controls startup order but does not by itself guarantee that MySQL is ready to accept connections. A database health check is a planned hardening improvement.
 
 ## Running the Project
 
@@ -403,7 +417,8 @@ src/
 │   │   │   ├── day04/
 │   │   │   ├── day05/
 │   │   │   ├── day06/
-│   │   │   └── day07/
+│   │   │   ├── day07/
+│   │   │   └── day08/
 │   │   ├── java/
 │   │   │   ├── day01/
 │   │   │   ├── day02/
@@ -445,7 +460,8 @@ notes/
 ├── day-04.md
 ├── day-05.md
 ├── day-06.md
-└── day-07.md
+├── day-07.md
+└── day-08.md
 ```
 
 ## Testing Approach
@@ -555,6 +571,25 @@ The JPA integration tests verify:
 - Disabled Open Session in View
 - Verified Flyway migration history and MySQL-backed application startup
 
+
+### Day 8
+
+- Reviewed the full persistence path without notes: controller -> service -> application repository -> JPA adapter -> mapper -> Spring Data repository -> MySQL
+- Reinforced Flyway versus Hibernate responsibilities, persistence UUID versus business transaction ID, database uniqueness, and `Instant` for global timestamps
+- Added a multi-stage `Dockerfile` using Maven/Java 21 for the build stage and a Java 21 JRE runtime stage
+- Built and ran the Spring Boot application as a Docker image
+- Extended `compose.yml` so the Spring Boot application and MySQL run in the same Compose stack
+- Used Docker service discovery with `mysql` as the database hostname inside the application container
+- Verified POST and GET transaction requests through the containerized application and JPA/MySQL persistence path
+- Verified MySQL data survives `docker compose stop` / `docker compose start` through the named volume
+- Reviewed concurrent duplicate transaction handling: application existence checks can race, while the database unique constraint is the final concurrency-safe guard
+- Discussed REST duplicate behavior as `409 Conflict` and asynchronous duplicate handling as idempotent acknowledgement; these remain design decisions until explicitly implemented and tested
+- Discussed service-level `@Transactional` boundaries for a complete unit of work; this remains a design topic until implemented
+- Implemented Merge Intervals using sorting plus greedy merging in `O(n log n)` time
+- Added parameterized Merge Intervals tests and used a defensive deep copy to avoid mutating caller-owned interval arrays
+- Learned SQL conditional aggregation using `SUM(CASE WHEN ... THEN ... ELSE ... END)` and reinforced `HAVING` for post-group filtering
+- Practised an interview explanation of why the service depends on an application-facing `TransactionRepository` abstraction rather than Spring Data JPA directly
+
 ## Learning Approach
 
 For each topic:
@@ -574,12 +609,13 @@ For each topic:
 - Define duplicate transaction ID behaviour at the service/API level
 - Handle database unique-constraint violations explicitly
 - Continue SQL practice using the relational transaction schema
-- Add Docker support for the Spring Boot application
-- Expand Docker Compose to run the application and database together
 - Continue DSA practice with heap, map, sorting, and interval patterns
 - Continue system-design exercises around transaction processing and idempotency
+- Add Spring Security with a concrete authentication/authorization use case and tests
 - Add Redis with a concrete caching use case
 - Add Kafka with a concrete transaction-processing use case
+- Refresh AWS through project work covering IAM, Secrets Manager, RDS/Aurora, S3, CloudWatch, VPC/security-group basics, ALB, and one practical container deployment path such as ECS/Fargate
+- Add a backend-focused AI learning track after core backend foundations: LLM fundamentals, Java/Spring integration, structured outputs/tool calling, embeddings/vector search or RAG only with a justified use case, plus AI security, PII, latency, cost, evaluation, and observability
 - Add API documentation
 - Add observability and production-style logging incrementally
 
