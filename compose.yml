@@ -1,0 +1,29 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: transaction-mysql
+    environment:
+      MYSQL_DATABASE: transaction_db
+      MYSQL_USER: app_user
+      MYSQL_PASSWORD: app_password
+      MYSQL_ROOT_PASSWORD: root_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+  app:
+    build: .
+    container_name: transaction-service
+    depends_on:
+      - mysql
+    environment:
+      SPRING_PROFILES_ACTIVE: jpa
+      DB_URL: jdbc:mysql://mysql:3306/transaction_db
+      DB_USERNAME: app_user
+      DB_PASSWORD: app_password
+    ports:
+      - "8080:8080"
+
+volumes:
+  mysql-data:
