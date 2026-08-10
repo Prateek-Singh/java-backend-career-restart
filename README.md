@@ -93,6 +93,11 @@ Returns:
 
 - `201 Created` for a valid request
 - `400 Bad Request` for invalid input, malformed JSON, or an unsupported transaction type
+- `409 Conflict` when the business transaction ID already exists
+
+The transaction ID acts as the business/idempotency identifier.
+
+The service performs an early duplicate check for clear application behavior, while the database unique constraint on the transaction ID remains the final concurrency-safe guard. A confirmed duplicate unique-constraint violation is translated into a domain duplicate exception and exposed as `409 Conflict`.
 
 Transactions are persisted through a `TransactionRepository` abstraction.
 
@@ -143,12 +148,23 @@ A global exception handler maps application failures to structured API responses
 Handled cases include:
 
 - transaction not found
+- duplicate transaction IDs
 - invalid arguments
 - invalid transaction amounts
 - Bean Validation failures
 - malformed request bodies
 - unsupported enum values
 - unexpected server errors
+
+Illustrative duplicate response:
+
+```json
+{
+  "status": 409,
+  "error": "Conflict",
+  "message": "Transaction with id TXN-123 already exists"
+}
+```
 
 Illustrative validation response:
 
@@ -418,7 +434,8 @@ src/
 │   │   │   ├── day05/
 │   │   │   ├── day06/
 │   │   │   ├── day07/
-│   │   │   └── day08/
+│   │   │   ├── day08/
+│   │   │   └── day09/
 │   │   ├── java/
 │   │   │   ├── day01/
 │   │   │   ├── day02/
@@ -461,7 +478,8 @@ notes/
 ├── day-05.md
 ├── day-06.md
 ├── day-07.md
-└── day-08.md
+├── day-08.md
+└── day-09.md
 ```
 
 ## Testing Approach
@@ -490,6 +508,8 @@ The JPA integration tests verify:
 - domain-to-entity mapping
 - entity-to-domain mapping
 - database-backed round trips
+- duplicate business transaction IDs are rejected by the database unique constraint
+- the expected unique-constraint violation is translated into `DuplicateTransactionException`
 
 ## Progress Summary
 
@@ -583,12 +603,32 @@ The JPA integration tests verify:
 - Verified POST and GET transaction requests through the containerized application and JPA/MySQL persistence path
 - Verified MySQL data survives `docker compose stop` / `docker compose start` through the named volume
 - Reviewed concurrent duplicate transaction handling: application existence checks can race, while the database unique constraint is the final concurrency-safe guard
-- Discussed REST duplicate behavior as `409 Conflict` and asynchronous duplicate handling as idempotent acknowledgement; these remain design decisions until explicitly implemented and tested
-- Discussed service-level `@Transactional` boundaries for a complete unit of work; this remains a design topic until implemented
+- Discussed REST duplicate behavior as `409 Conflict` and asynchronous duplicate handling as idempotent acknowledgement
+- Discussed service-level `@Transactional` boundaries for a complete unit of work
 - Implemented Merge Intervals using sorting plus greedy merging in `O(n log n)` time
 - Added parameterized Merge Intervals tests and used a defensive deep copy to avoid mutating caller-owned interval arrays
 - Learned SQL conditional aggregation using `SUM(CASE WHEN ... THEN ... ELSE ... END)` and reinforced `HAVING` for post-group filtering
 - Practised an interview explanation of why the service depends on an application-facing `TransactionRepository` abstraction rather than Spring Data JPA directly
+
+
+### Day 9
+
+- Implemented explicit duplicate transaction behavior with `409 Conflict`
+- Added `DuplicateTransactionException`
+- Added service-level early duplicate detection for a cleaner application failure path
+- Kept the database unique constraint on the business transaction ID as the final concurrency-safe duplicate guard
+- Updated the JPA adapter to translate the expected transaction-ID unique-constraint violation into the domain duplicate exception
+- Used `saveAndFlush()` so persistence violations can be classified before the adapter returns; flush remains separate from transaction commit
+- Updated H2 JPA tests to use the Flyway-managed schema with Hibernate `ddl-auto=validate`
+- Aligned UUID handling in H2 with the Flyway `BINARY(16)` schema
+- Added Spring service-level `@Transactional` boundaries and `readOnly = true` for read operations where appropriate
+- Added service, exception-handler, JPA integration, and REST integration coverage for duplicate behavior
+- Reviewed client retries, asynchronous redelivery, acknowledgement ordering, failure classification, and idempotent processing
+- Implemented Longest Substring Without Repeating Characters using an `O(n)` sliding window with a `HashSet`
+- Added parameterized tests for the sliding-window solution, including empty and null input
+- Reinforced SQL conditional aggregation, conditional counting, credit/debit totals, net amount, and `HAVING`
+- Practised a concise interview explanation of an idempotent transaction-creation API
+- Full `mvn clean test` passed
 
 ## Learning Approach
 
@@ -606,8 +646,6 @@ For each topic:
 
 - Add database-backed integration testing against MySQL where it provides value
 - Review the current Flyway version against MySQL 8.4 compatibility
-- Define duplicate transaction ID behaviour at the service/API level
-- Handle database unique-constraint violations explicitly
 - Continue SQL practice using the relational transaction schema
 - Continue DSA practice with heap, map, sorting, and interval patterns
 - Continue system-design exercises around transaction processing and idempotency

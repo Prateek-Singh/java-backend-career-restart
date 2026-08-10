@@ -1,14 +1,18 @@
 package com.prateek.learning.transaction.persistence.adapter;
 
+import com.prateek.learning.common.exception.DuplicateTransactionException;
 import com.prateek.learning.transaction.model.Transaction;
 import com.prateek.learning.transaction.persistence.entity.TransactionEntity;
 import com.prateek.learning.transaction.persistence.mapper.TransactionEntityMapper;
 import com.prateek.learning.transaction.persistence.repository.SpringDataTransactionRepository;
 import com.prateek.learning.transaction.repository.TransactionRepository;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.context.annotation.Profile;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 @Component
@@ -29,8 +33,47 @@ public class JpaTransactionRepositoryAdapter
     @Override
     public Transaction save(Transaction transaction) {
         TransactionEntity transactionEntity = mapper.toEntity(transaction);
-        TransactionEntity savedEntity = springDataTransactionRepository.save(transactionEntity);
-        return mapper.toDomain(savedEntity);
+
+        try {
+            TransactionEntity savedEntity =
+                    springDataTransactionRepository.saveAndFlush(transactionEntity);
+
+            return mapper.toDomain(savedEntity);
+
+        } catch (DataIntegrityViolationException exception) {
+            if (isDuplicateTransactionIdViolation(exception)) {
+                throw new DuplicateTransactionException(
+                        "Transaction with id "
+                                + transaction.getId()
+                                + " already exists"
+                );
+            }
+
+            throw exception;
+        }
+    }
+
+    private boolean isDuplicateTransactionIdViolation(
+            DataIntegrityViolationException exception
+    ) {
+        Throwable cause = exception;
+
+        while (cause != null) {
+            if (cause instanceof ConstraintViolationException constraintException) {
+
+                String constraintName = constraintException.getConstraintName();
+
+                if (constraintName != null
+                        && constraintName.toLowerCase(Locale.ROOT)
+                        .contains("uk_transactions_transaction_id")) {
+                    return true;
+                }
+            }
+
+            cause = cause.getCause();
+        }
+
+        return false;
     }
 
     @Override

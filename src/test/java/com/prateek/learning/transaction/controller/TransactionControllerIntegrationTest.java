@@ -133,4 +133,44 @@ class TransactionControllerIntegrationTest {
                 .andExpect(jsonPath("$[*].accountId",
                         everyItem(is("ACC-111"))));
     }
+
+    @Test
+    void shouldReturnConflictWhenCreatingDuplicateTransaction() throws Exception {
+        CreateTransactionRequest transactionRequest = new CreateTransactionRequest(
+                "TXN-119",
+                "ACC-111",
+                BigDecimal.TEN,
+                TransactionType.CREDIT,
+                "Monthly EMI"
+        );
+
+        mockMvc.perform(
+                        post("/transactions")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .accept(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(transactionRequest))
+                )
+                .andExpect(status().isCreated())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.id").value("TXN-119"))
+                .andExpect(jsonPath("$.accountId").value("ACC-111"))
+                .andExpect(jsonPath("$.amount").value(10))
+                .andExpect(jsonPath("$.type").value("CREDIT"))
+                .andExpect(jsonPath("$.description").value("Monthly EMI"))
+                .andExpect(jsonPath("$.timestamp").exists());
+
+        mockMvc.perform(
+                        post("/transactions")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .accept(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(transactionRequest))
+                )
+                .andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.error").value("Conflict"))
+                .andExpect(jsonPath("$.message").value("Transaction with id TXN-119 already exists"));
+
+
+    }
 }

@@ -86,4 +86,27 @@ class GlobalExceptionHandlerTest {
                 response.getBody().message()
         );
     }
+
+    @Test
+    void shouldHandleDuplicateTransaction() {
+        ResponseEntity<ApiError> response =
+                handler.handleDuplicateTransaction(
+                        new DuplicateTransactionException("Transaction with id TXN-100 already exists")
+                );
+
+        assertEquals(
+                HttpStatus.CONFLICT,
+                response.getStatusCode()
+        );
+        assertNotNull(response.getBody());
+        assertEquals(409, response.getBody().status());
+        assertEquals(
+                "Conflict",
+                response.getBody().error()
+        );
+        assertEquals(
+                "Transaction with id TXN-100 already exists",
+                response.getBody().message()
+        );
+    }
 }

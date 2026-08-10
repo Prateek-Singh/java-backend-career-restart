@@ -94,6 +94,21 @@ public class GlobalExceptionHandler {
                 .body(apiError);
     }
 
+    @ExceptionHandler(DuplicateTransactionException.class)
+    public ResponseEntity<ApiError> handleDuplicateTransaction(
+            DuplicateTransactionException exception
+    ) {
+        ApiError apiError = new ApiError(
+                HttpStatus.CONFLICT.value(),
+                HttpStatus.CONFLICT.getReasonPhrase(),
+                exception.getMessage()
+        );
+
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(apiError);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleException(Exception exception) {
         HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;

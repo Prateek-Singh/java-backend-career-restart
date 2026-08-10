@@ -1,5 +1,6 @@
 package com.prateek.learning.transaction.service;
 
+import com.prateek.learning.common.exception.DuplicateTransactionException;
 import com.prateek.learning.transaction.dto.CreateTransactionRequest;
 import com.prateek.learning.transaction.model.Transaction;
 import com.prateek.learning.transaction.model.TransactionType;
@@ -13,13 +14,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class TransactionServiceTest {
@@ -116,5 +117,29 @@ class TransactionServiceTest {
 
         verify(transactionRepository)
                 .findByAccountId("ACC-111");
+    }
+
+    @Test
+    void shouldThrowDuplicateTransactionWhenTransactionExists() {
+        CreateTransactionRequest request = new CreateTransactionRequest(
+                "TXN-131",
+                "ACC-131",
+                BigDecimal.TEN,
+                TransactionType.CREDIT,
+                "Monthly Savings"
+        );
+
+        Transaction repositoryResult = new Transaction();
+        repositoryResult.setId(request.id());
+        repositoryResult.setAccountId(request.accountId());
+
+        when(transactionRepository.findById(request.id())).thenReturn(Optional.of(repositoryResult));
+
+        assertThatThrownBy(
+                () -> transactionService.createTransaction(request))
+        .isInstanceOf(DuplicateTransactionException.class)
+                .hasMessage("Transaction with id " + request.id() + " already exists");
+
+        verify(transactionRepository, never()).save(any(Transaction.class));
     }
 }

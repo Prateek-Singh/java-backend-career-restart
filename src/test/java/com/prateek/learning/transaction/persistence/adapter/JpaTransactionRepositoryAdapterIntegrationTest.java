@@ -1,5 +1,6 @@
 package com.prateek.learning.transaction.persistence.adapter;
 
+import com.prateek.learning.common.exception.DuplicateTransactionException;
 import com.prateek.learning.transaction.model.Transaction;
 import com.prateek.learning.transaction.model.TransactionType;
 import com.prateek.learning.transaction.repository.TransactionRepository;
@@ -14,6 +15,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @ActiveProfiles("jpa")
@@ -93,5 +95,33 @@ class JpaTransactionRepositoryAdapterIntegrationTest {
         assertThat(transactions)
                 .extracting(Transaction::getAccountId)
                 .containsOnly("ACC-126");
+    }
+
+    @Test
+    void shouldThrowDuplicateTransactionExceptionWhenUniqueTransactionIdConstraintIsViolated() {
+        Transaction transaction = new Transaction();
+        transaction.setId("TXN-125");
+        transaction.setAccountId("ACC-125");
+        transaction.setAmount(new BigDecimal("25.00"));
+        transaction.setType(TransactionType.CREDIT);
+        transaction.setDescription("Monthly EMI");
+        transaction.setTimestamp(Instant.now());
+
+        Transaction duplicateTransaction = new Transaction();
+        duplicateTransaction.setId("TXN-125");
+        duplicateTransaction.setAccountId("ACC-125");
+        duplicateTransaction.setAmount(new BigDecimal("25.00"));
+        duplicateTransaction.setType(TransactionType.CREDIT);
+        duplicateTransaction.setDescription("Monthly EMI");
+        duplicateTransaction.setTimestamp(Instant.now());
+
+        Transaction savedTransaction = transactionRepository.save(transaction);
+        assertNotNull(savedTransaction);
+
+        assertThatThrownBy(
+                () -> transactionRepository.save(duplicateTransaction)
+        )
+        .isInstanceOf(DuplicateTransactionException.class)
+        .hasMessage("Transaction with id TXN-125 already exists");
     }
 }
