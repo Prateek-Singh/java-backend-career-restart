@@ -630,6 +630,15 @@ The JPA integration tests verify:
 - Practised a concise interview explanation of an idempotent transaction-creation API
 - Full `mvn clean test` passed
 
+### Day 9 Closure Snapshot
+
+- Focused study time: 3 hours 15 minutes
+- Confidence: Spring/JPA 8/10; Testing 8/10; SQL 8/10; DSA 6/10; System Design 7/10; Docker/Compose 7/10
+- `mvn clean test` passed
+- Day 9 changes committed and pushed
+- Duplicate transaction handling and service transaction boundaries are complete for the current milestone
+- DSA coaching will now include pattern revision, pattern discussion before coding, and one related take-home problem at day closure
+
 ## Learning Approach
 
 For each topic:

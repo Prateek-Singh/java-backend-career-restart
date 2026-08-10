@@ -364,3 +364,48 @@ Passed.
 ## Day 9 Git Status
 
 Commit and push pending at the time this note was written.
+
+## Day 9 Closure
+
+- Focused study time: **3 hours 15 minutes**
+- Spring / JPA: **8/10**
+- Testing: **8/10**
+- SQL: **8/10**
+- DSA: **6/10**
+- System Design: **7/10**
+- Docker / Compose: **7/10**
+- Final test status: `mvn clean test` passed
+- Git status: changes committed and pushed
+
+### DSA Coaching Adjustment
+
+From Day 10 onward:
+
+1. Revise previously learned DSA patterns regularly.
+2. Discuss the pattern before introducing the daily DSA problem.
+3. Walk through one small example before implementation.
+4. Let the learner attempt the solution before reviewing/refining it.
+5. Close each day with one related take-home problem to attempt independently.
+6. Review that take-home problem before starting the next day's new work.
+
+### Day 9 Take-Home Question
+
+Given a string, return the **length of the longest substring containing at most 2 distinct characters**.
+
+Examples:
+
+```text
+"eceba"   -> 3
+"ccaabbb" -> 5
+```
+
+Before coding, identify:
+
+- the DSA pattern
+- what makes the current window invalid
+- whether a `Set` is sufficient
+- what state must be maintained while shrinking
+- the roles of `left` and `right`
+- expected time and space complexity
+
+This will be reviewed before Day 10 begins.
