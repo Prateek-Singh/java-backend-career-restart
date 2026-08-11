@@ -15,6 +15,8 @@ It contains progressive exercises and a Spring Boot transaction API used to rebu
 - MockMvc controller-slice testing
 - Spring Boot integration testing
 - Spring Data JPA
+- Spring Security
+- BCrypt password hashing
 - Relational persistence with MySQL
 - Flyway database migrations
 - Data structures and algorithms
@@ -22,6 +24,9 @@ It contains progressive exercises and a Spring Boot transaction API used to rebu
 - Backend layering and repository design
 - Idempotency and transaction-processing design
 - System design and interview preparation
+- Spring Security fundamentals
+- Stateless REST authentication
+- Authentication and authorization testing
 
 ## Tech Stack Used in This Repository
 
@@ -30,6 +35,8 @@ It contains progressive exercises and a Spring Boot transaction API used to rebu
 - Spring Boot
 - Spring MVC
 - Spring Data JPA
+- Spring Security
+- BCrypt password hashing
 - Jakarta Bean Validation
 - MySQL
 - H2
@@ -100,6 +107,60 @@ The transaction ID acts as the business/idempotency identifier.
 The service performs an early duplicate check for clear application behavior, while the database unique constraint on the transaction ID remains the final concurrency-safe guard. A confirmed duplicate unique-constraint violation is translated into a domain duplicate exception and exposed as `409 Conflict`.
 
 Transactions are persisted through a `TransactionRepository` abstraction.
+
+## API Security
+
+All transaction endpoints currently require authentication.
+
+Protected paths include:
+
+```text
+POST /transactions
+GET  /transactions/{transactionId}
+GET  /transactions/account/{accountId}
+```
+
+The current learning implementation uses HTTP Basic authentication through Spring Security.
+
+Security behavior is configured through `SecurityFilterChain`:
+
+- `/transactions/**` requires authentication
+- HTTP sessions are stateless
+- HTTP Basic is enabled
+- CSRF is disabled for the current stateless Authorization-header based authentication model
+
+The application currently uses an in-memory `UserDetailsService` with `USER` and `ADMIN` roles for security learning and testing.
+
+Passwords are hashed using BCrypt through Spring Security's `PasswordEncoder`.
+
+Current authentication behavior:
+
+```text
+missing credentials
+-> 401 Unauthorized
+
+invalid credentials
+-> 401 Unauthorized
+
+valid credentials
+-> request proceeds to controller/application logic
+```
+
+The intended authorization model is:
+
+```text
+USER
+-> access only their own accounts and transactions
+
+ADMIN
+-> access any account or transaction
+```
+
+Resource-level ownership authorization is intentionally deferred until the application has a genuine user/account ownership model. An artificial ownership mapping was not added only to demonstrate `403 Forbidden`.
+
+HTTP Basic is being used to establish and test the security fundamentals first. JWT/token-based authentication is planned only after the authentication/authorization model is stable.
+
+Because HTTP Basic credentials are Base64 encoded rather than encrypted, HTTPS/TLS is required for any real deployment.
 
 The active repository implementation depends on the Spring profile:
 
@@ -441,6 +502,7 @@ src/
 │   │   │   ├── day02/
 │   │   │   └── day03/
 │   │   └── transaction/
+│   │       ├── config/
 │   │       ├── controller/
 │   │       ├── dto/
 │   │       ├── exception/
@@ -479,7 +541,8 @@ notes/
 ├── day-06.md
 ├── day-07.md
 ├── day-08.md
-└── day-09.md
+├── day-09.md
+└── day-10.md
 ```
 
 ## Testing Approach
@@ -489,6 +552,7 @@ The project separates tests by responsibility.
 - **Repository unit tests** verify repository contracts and lookup behaviour.
 - **Service unit tests** verify business rules and repository delegation.
 - **Controller-slice tests** use `@WebMvcTest`, `MockMvc`, and a mocked service.
+- **Security controller tests** verify unauthenticated, invalid-credential, and authenticated request behavior.
 - **Application integration tests** verify request-to-repository behaviour through the Spring context.
 - **JPA integration tests** verify the adapter, mapper, Spring Data repository, and relational persistence path using H2.
 - **Exception-handler tests** verify structured API error responses.
@@ -499,6 +563,15 @@ Invalid HTTP requests are tested to confirm that:
 - `400 Bad Request` is returned
 - the expected validation message is included
 - the service layer is not called
+
+Security tests verify that:
+
+- missing authentication returns `401 Unauthorized`
+- invalid HTTP Basic credentials return `401 Unauthorized`
+- valid credentials allow the request to proceed to controller behavior
+- authentication failures are rejected before the service layer is invoked
+- controller-slice tests load the intended application `SecurityConfig`
+- integration tests authenticate explicitly before exercising secured transaction flows
 
 The JPA integration tests verify:
 
@@ -639,6 +712,38 @@ The JPA integration tests verify:
 - Duplicate transaction handling and service transaction boundaries are complete for the current milestone
 - DSA coaching will now include pattern revision, pattern discussion before coding, and one related take-home problem at day closure
 
+### Day 10
+
+- Completed the Day 9 take-home problem: Longest Substring With At Most Two Distinct Characters using a sliding window plus character-frequency map
+- Reinforced why frequency state requires a `HashMap` rather than only a `HashSet`
+- Revised DSA recognition across hash/map lookup, frequency maps, heap/top-K, sorting + greedy intervals, and sliding window
+- Reinforced `saveAndFlush()` versus transaction commit, transaction atomicity versus concurrent uniqueness, `readOnly = true`, and commit-before-acknowledgement behavior
+- Added Spring Security and Spring Security test support
+- Added a custom `SecurityFilterChain`
+- Protected `/transactions/**` behind authentication
+- Configured stateless HTTP sessions using `SessionCreationPolicy.STATELESS`
+- Enabled HTTP Basic for the first security-learning implementation
+- Disabled CSRF specifically for the current stateless Authorization-header authentication model
+- Added BCrypt password hashing through `PasswordEncoder`
+- Added temporary in-memory `USER` and `ADMIN` identities through `UserDetailsService`
+- Debugged an incorrect `/transaction/**` security matcher that had allowed the real `/transactions/**` endpoints to fall through to `permitAll()`
+- Updated controller-slice and application integration tests to authenticate explicitly
+- Added focused tests for missing credentials, invalid credentials, and successful authenticated access
+- Verified authentication failures are rejected before the service layer is invoked
+- Designed USER ownership versus ADMIN unrestricted-access authorization but deliberately deferred implementation until a genuine user/account ownership model exists
+- Reviewed `401 Unauthorized`, `403 Forbidden`, `404 Not Found`, and `503 Service Unavailable` security/failure semantics
+- Reviewed TLS requirements, sensitive authentication logging, identity-provider failure behavior, and stateless horizontal scaling
+- Reinforced SQL conditional aggregation and conditional `HAVING` for accounts with at least three CREDIT transactions
+- Practised a concise Spring Security interview explanation
+- Full `mvn clean test` passed
+
+### Day 10 Closure Snapshot
+
+- Focused study time: 2 hours 30 minutes
+- Confidence: Spring/Security 6/10; Testing 8/10; SQL 8/10; DSA 7/10; System Design 7/10; Docker/Compose 8/10
+- Full `mvn clean test` passed
+- Git commit/push pending at the time of README generation
+
 ## Learning Approach
 
 For each topic:
@@ -658,7 +763,8 @@ For each topic:
 - Continue SQL practice using the relational transaction schema
 - Continue DSA practice with heap, map, sorting, and interval patterns
 - Continue system-design exercises around transaction processing and idempotency
-- Add Spring Security with a concrete authentication/authorization use case and tests
+- Extend Spring Security from the current HTTP Basic authentication foundation to credible resource-level authorization once user/account ownership is modelled
+- Add JWT/token authentication only after the current Spring Security fundamentals are stable and well tested
 - Add Redis with a concrete caching use case
 - Add Kafka with a concrete transaction-processing use case
 - Refresh AWS through project work covering IAM, Secrets Manager, RDS/Aurora, S3, CloudWatch, VPC/security-group basics, ALB, and one practical container deployment path such as ECS/Fargate
