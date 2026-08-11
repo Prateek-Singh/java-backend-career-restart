@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.math.BigDecimal;
 
 import static org.hamcrest.Matchers.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -49,6 +50,7 @@ class TransactionControllerIntegrationTest {
 
         mockMvc.perform(
                         post("/transactions")
+                                .with(httpBasic("user", "password"))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .accept(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request))
@@ -64,6 +66,7 @@ class TransactionControllerIntegrationTest {
 
         mockMvc.perform(
                         get("/transactions/TXN-111")
+                                .with(httpBasic("user", "password"))
                                 .accept(MediaType.APPLICATION_JSON)
                 )
                 .andExpect(status().isOk())
@@ -96,6 +99,7 @@ class TransactionControllerIntegrationTest {
 
         mockMvc.perform(
                         post("/transactions")
+                                .with(httpBasic("user", "password"))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .accept(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(transactionRequest1))
@@ -111,6 +115,7 @@ class TransactionControllerIntegrationTest {
 
         mockMvc.perform(
                         post("/transactions")
+                                .with(httpBasic("user", "password"))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .accept(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(transactionRequest2))
@@ -124,7 +129,8 @@ class TransactionControllerIntegrationTest {
                 .andExpect(jsonPath("$.description").value("Monthly Salary"))
                 .andExpect(jsonPath("$.timestamp").exists());
 
-        mockMvc.perform(get("/transactions/account/{accountId}", "ACC-111"))
+        mockMvc.perform(get("/transactions/account/{accountId}", "ACC-111")
+                        .with(httpBasic("user", "password")))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.length()").value(2))
@@ -146,6 +152,7 @@ class TransactionControllerIntegrationTest {
 
         mockMvc.perform(
                         post("/transactions")
+                                .with(httpBasic("user", "password"))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .accept(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(transactionRequest))
@@ -161,6 +168,7 @@ class TransactionControllerIntegrationTest {
 
         mockMvc.perform(
                         post("/transactions")
+                                .with(httpBasic("user", "password"))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .accept(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(transactionRequest))

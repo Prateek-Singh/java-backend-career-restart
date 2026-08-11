@@ -3,6 +3,7 @@ package com.prateek.learning.transaction.controller;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.prateek.learning.common.exception.GlobalExceptionHandler;
+import com.prateek.learning.transaction.config.SecurityConfig;
 import com.prateek.learning.transaction.dto.CreateTransactionRequest;
 import com.prateek.learning.transaction.exception.TransactionNotFoundException;
 import com.prateek.learning.transaction.model.Transaction;
@@ -24,12 +25,13 @@ import java.util.List;
 import static org.hamcrest.Matchers.*;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(TransactionController.class)
-@Import(GlobalExceptionHandler.class)
+@Import({GlobalExceptionHandler.class, SecurityConfig.class})
 class TransactionControllerTest {
 
     @Autowired
@@ -40,6 +42,48 @@ class TransactionControllerTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    //security tests
+    @Test
+    void shouldReturnUnauthorizedWhenCredentialsAreMissing() throws Exception {
+        mockMvc.perform(get("/transactions/TXN-001"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(transactionService);
+    }
+
+    @Test
+    void shouldAllowAuthenticatedUser() throws Exception {
+        Transaction transaction = new Transaction(
+                "TXN-001",
+                "ACC-1001",
+                new BigDecimal("25000.00"),
+                TransactionType.CREDIT,
+                "Monthly Salary",
+                Instant.now()
+        );
+
+        when(transactionService.getTransactionById("TXN-001"))
+                .thenReturn(transaction);
+
+        mockMvc.perform(
+                        get("/transactions/TXN-001")
+                                .with(httpBasic("user", "password"))
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("TXN-001"));
+    }
+
+    @Test
+    void shouldReturnUnauthorizedForInvalidCredentials() throws Exception {
+        mockMvc.perform(
+                        get("/transactions/TXN-001")
+                                .with(httpBasic("user", "wrong-password"))
+                )
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(transactionService);
+    }
 
     @Test
     void shouldReturnTransactionWhenTransactionExists() throws Exception {
@@ -55,7 +99,8 @@ class TransactionControllerTest {
         when(transactionService.getTransactionById("TXN-001"))
                 .thenReturn(transaction);
 
-        mockMvc.perform(get("/transactions/TXN-001"))
+        mockMvc.perform(get("/transactions/TXN-001")
+                        .with(httpBasic("user", "password")))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith("application/json"))
                 .andExpect(jsonPath("$.id").value("TXN-001"))
@@ -74,7 +119,8 @@ class TransactionControllerTest {
                         )
                 );
 
-        mockMvc.perform(get("/transactions/TXN-999"))
+        mockMvc.perform(get("/transactions/TXN-999")
+                        .with(httpBasic("user", "password")))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.error").value("Not Found"))
@@ -108,7 +154,8 @@ class TransactionControllerTest {
         when(transactionService.findByAccountId("ACC-1001"))
                 .thenReturn(transactions);
 
-        mockMvc.perform(get("/transactions/account/ACC-1001"))
+        mockMvc.perform(get("/transactions/account/ACC-1001")
+                        .with(httpBasic("user", "password")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath(
@@ -126,7 +173,8 @@ class TransactionControllerTest {
         when(transactionService.findByAccountId("UNKNOWN"))
                 .thenReturn(List.of());
 
-        mockMvc.perform(get("/transactions/account/UNKNOWN"))
+        mockMvc.perform(get("/transactions/account/UNKNOWN")
+                        .with(httpBasic("user", "password")))
                 .andExpect(status().isOk())
                 .andExpect(content().json("[]"));
     }
@@ -154,6 +202,7 @@ class TransactionControllerTest {
                 .thenReturn(createdTransaction);
 
         mockMvc.perform(post("/transactions")
+                        .with(httpBasic("user", "password"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -179,6 +228,7 @@ class TransactionControllerTest {
         );
 
         mockMvc.perform(post("/transactions")
+                        .with(httpBasic("user", "password"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -204,6 +254,7 @@ class TransactionControllerTest {
         );
 
         mockMvc.perform(post("/transactions")
+                        .with(httpBasic("user", "password"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -229,6 +280,7 @@ class TransactionControllerTest {
         );
 
         mockMvc.perform(post("/transactions")
+                        .with(httpBasic("user", "password"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -254,6 +306,7 @@ class TransactionControllerTest {
         );
 
         mockMvc.perform(post("/transactions")
+                        .with(httpBasic("user", "password"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -279,6 +332,7 @@ class TransactionControllerTest {
         );
 
         mockMvc.perform(post("/transactions")
+                        .with(httpBasic("user", "password"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -304,6 +358,7 @@ class TransactionControllerTest {
         );
 
         mockMvc.perform(post("/transactions")
+                        .with(httpBasic("user", "password"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -331,6 +386,7 @@ class TransactionControllerTest {
         """;
 
         mockMvc.perform(post("/transactions")
+                        .with(httpBasic("user", "password"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON)
                         .content(json))
