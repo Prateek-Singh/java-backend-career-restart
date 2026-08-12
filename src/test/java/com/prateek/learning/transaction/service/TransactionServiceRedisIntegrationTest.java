@@ -18,6 +18,10 @@ import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.test.context.ActiveProfiles;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -27,6 +31,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
+@Testcontainers
 @SpringBootTest(classes = {
         TransactionServiceRedisIntegrationTest.TestConfig.class,
         CacheConfig.class,
@@ -34,6 +39,11 @@ import static org.mockito.Mockito.*;
 })
 @ActiveProfiles("jpa")
 class TransactionServiceRedisIntegrationTest {
+
+    @Container
+    static final GenericContainer<?> redis =
+            new GenericContainer<>(DockerImageName.parse("redis:7.4"))
+                    .withExposedPorts(6379);
 
     @Autowired
     private TransactionService transactionService;
@@ -75,7 +85,7 @@ class TransactionServiceRedisIntegrationTest {
 
         @Bean
         RedisConnectionFactory redisConnectionFactory() {
-            return new LettuceConnectionFactory("localhost", 6379);
+            return new LettuceConnectionFactory(redis.getHost(), redis.getMappedPort(6379));
         }
 
         @Bean
