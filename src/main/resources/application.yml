@@ -1,3 +1,5 @@
 spring:
   profiles:
     active: in-memory
+  cache:
+    type: none

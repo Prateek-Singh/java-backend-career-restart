@@ -16,6 +16,9 @@ It contains progressive exercises and a Spring Boot transaction API used to rebu
 - Spring Boot integration testing
 - Spring Data JPA
 - Spring Security
+- Spring Cache
+- Spring Data Redis
+- Redis
 - BCrypt password hashing
 - Relational persistence with MySQL
 - Flyway database migrations
@@ -27,6 +30,8 @@ It contains progressive exercises and a Spring Boot transaction API used to rebu
 - Spring Security fundamentals
 - Stateless REST authentication
 - Authentication and authorization testing
+- Redis caching and cache-aside design
+- Cache resilience and graceful degradation
 
 ## Tech Stack Used in This Repository
 
@@ -36,6 +41,9 @@ It contains progressive exercises and a Spring Boot transaction API used to rebu
 - Spring MVC
 - Spring Data JPA
 - Spring Security
+- Spring Cache
+- Spring Data Redis
+- Redis
 - BCrypt password hashing
 - Jakarta Bean Validation
 - MySQL
@@ -166,6 +174,42 @@ The active repository implementation depends on the Spring profile:
 
 - `in-memory` uses the in-memory repository
 - `jpa` uses the JPA-backed repository adapter
+
+
+## Redis Caching
+
+`GET /transactions/{transactionId}` is cached through Spring Cache with Redis when the JPA/Redis runtime configuration is active.
+
+This endpoint was chosen because transactions are effectively immutable after creation in the current API, which keeps invalidation simple.
+
+Current cache contract:
+
+```text
+Source of truth       MySQL
+Strategy              cache-aside
+Cache hit             return cached transaction and skip DB
+Cache miss            load from DB, cache the value, then return it
+Missing transaction   return 404; do not negative-cache initially
+TTL                   30 minutes
+Cache key             transactions::<transactionId>
+Value serialization   JSON
+Redis unavailable     fall back to MySQL
+```
+
+Redis is treated as a performance optimization rather than a hard dependency for transaction reads.
+
+A custom cache error handler logs Redis GET/PUT/EVICT/CLEAR failures without propagating them into the API request. When Redis is unavailable, a transaction read falls back to MySQL and can still return `200 OK` if the database is healthy.
+
+Short Redis connection/command timeouts are configured so fallback does not wait indefinitely.
+
+The failure trade-off is explicit: Redis outage preserves correctness, but latency and database load increase. If the database cannot absorb the redirected traffic, a cache outage can still become a production incident.
+
+Cache values use JSON rather than JDK-native serialization so they are easier to inspect and less tightly coupled to Java serialization.
+
+Not-found results are not cached initially. A missing transaction may be created later, so negative caching would require a deliberate short TTL and/or invalidation rule to avoid stale `404` responses.
+
+Cache-stampede and hot-key risks are understood but mitigation is deferred until a real scale requirement justifies it.
+
 
 ## Validation and Domain Rules
 
@@ -393,15 +437,15 @@ JPA integration tests use H2 through test-specific configuration, so MySQL is no
 
 ## Running the Application and MySQL with Docker Compose
 
-The repository includes a multi-stage `Dockerfile` for the Spring Boot application and a root-level `compose.yml` that runs the application together with MySQL 8.4.
+The repository includes a multi-stage `Dockerfile` for the Spring Boot application and a root-level `compose.yml` that runs the application together with MySQL 8.4 and Redis 7.4.
 
-The application container connects to MySQL through Docker Compose service discovery using the service name `mysql`:
+The application container connects to MySQL and Redis through Docker Compose service discovery using the service names `mysql` and `redis`.
 
 ```text
 jdbc:mysql://mysql:3306/transaction_db
 ```
 
-Inside a container, `localhost` refers to that same container, so the Compose service name is used instead of `localhost` for application-to-database traffic.
+Inside a container, `localhost` refers to that same container, so Compose service names are used instead of `localhost` for application-to-database and application-to-Redis traffic.
 
 Build and start the full stack:
 
@@ -421,7 +465,7 @@ Check status:
 docker compose ps
 ```
 
-Stop both containers while preserving the MySQL volume:
+Stop the Compose services while preserving the MySQL volume:
 
 ```bash
 docker compose stop
@@ -556,6 +600,9 @@ The project separates tests by responsibility.
 - **Application integration tests** verify request-to-repository behaviour through the Spring context.
 - **JPA integration tests** verify the adapter, mapper, Spring Data repository, and relational persistence path using H2.
 - **Exception-handler tests** verify structured API error responses.
+- **Cache-proxy tests** verify that repeated service lookups are intercepted by Spring caching and avoid repeated repository calls.
+- **Redis cache error-handler tests** verify cache failures are logged/swallowed rather than rethrown.
+- **Redis integration tests** verify real Redis JSON serialization, cache writes, cache reads, and repository bypass on cache hit.
 - **DSA tests** cover happy paths, edge cases, invalid input, duplicates, ties, and ordering assumptions.
 
 Invalid HTTP requests are tested to confirm that:
@@ -742,7 +789,44 @@ The JPA integration tests verify:
 - Focused study time: 2 hours 30 minutes
 - Confidence: Spring/Security 6/10; Testing 8/10; SQL 8/10; DSA 7/10; System Design 7/10; Docker/Compose 8/10
 - Full `mvn clean test` passed
+- Day 10 changes were committed and pushed
+
+
+### Day 11
+
+- Completed Longest Repeating Character Replacement using a sliding window plus character-frequency map
+- Reinforced DSA state, invariant, invalid-window condition, repair rule, answer update timing, and edge-case validation before coding
+- Corrected the `k == 0` edge case and an incorrect map/index lookup in the initial implementation
+- Reinforced the monotonic/stale `maxFrequency` optimization and the distinction between exact-current-window validity and maximum-length correctness
+- Changed the DSA workflow so new DSA problems are completed inside the study session rather than routinely assigned as take-home work
+- Completed no-notes Spring Security retrieval covering authentication/authorization, filter-chain flow, `SecurityContext`, `UserDetailsService`, BCrypt, `401`/`403`, statelessness, CSRF reasoning, and deliberate JWT deferral
+- Designed Redis caching before implementation and chose `GET /transactions/{transactionId}` because transactions are effectively immutable in the current API
+- Added Spring Cache and Spring Data Redis dependencies
+- Added Redis 7.4 to Docker Compose and verified connectivity with `redis-cli ping`
+- Added cache-aside transaction lookup with a 30-minute TTL and namespaced transaction keys
+- Configured Redis cache values to use JSON serialization rather than JDK-native serialization
+- Improved unexpected-exception logging while keeping the client `500` response generic
+- Diagnosed the original Redis `SerializationException` from the default JDK serializer
+- Added short Redis connection/command timeouts
+- Added a custom `RedisCacheErrorHandler` so cache failures degrade to MySQL instead of failing the API
+- Manually verified Redis-down behavior: cache GET failure -> MySQL query -> cache PUT failure -> HTTP `200`
+- Reviewed cache stampede, hot keys, negative caching, TTL/invalidation trade-offs, and cache-outage DB pressure
+- Added `TransactionServiceCacheTest` to prove two service lookups result in one repository lookup through Spring's cache proxy
+- Added `RedisCacheErrorHandlerTest` for GET, PUT, EVICT, and CLEAR failure behavior
+- Added a focused real-Redis integration test proving JSON serialization and repository bypass on the second lookup
+- Reinforced SQL conditional aggregation and `HAVING` for accounts with at least three CREDIT transactions
+- Full `mvn clean test` passed with Redis available for the real Redis integration test
+
+### Day 11 Closure Snapshot
+
+- DSA completed in-session; no routine DSA take-home will be assigned going forward
+- Spring Security retrieval completed
+- Redis cache foundation and graceful-degradation behavior completed
+- Cache-proxy, cache error-handler, and real Redis integration tests passed
+- SQL reinforcement completed
+- Full `mvn clean test` passed
 - Git commit/push pending at the time of README generation
+
 
 ## Learning Approach
 
@@ -754,18 +838,19 @@ For each topic:
 4. Improve design or complexity.
 5. Add focused tests.
 6. Record key learnings.
-7. Commit and push completed work.
+7. For DSA, complete pattern recognition, manual walkthrough, implementation, review, complexity, edge cases, and tests inside the study session unless take-home work is explicitly requested.
+8. Commit and push completed work.
 
 ## Next Planned Improvements
 
 - Add database-backed integration testing against MySQL where it provides value
 - Review the current Flyway version against MySQL 8.4 compatibility
 - Continue SQL practice using the relational transaction schema
-- Continue DSA practice with heap, map, sorting, and interval patterns
+- Continue in-session DSA practice with explicit state/invariant reasoning across current patterns before expanding further
 - Continue system-design exercises around transaction processing and idempotency
 - Extend Spring Security from the current HTTP Basic authentication foundation to credible resource-level authorization once user/account ownership is modelled
 - Add JWT/token authentication only after the current Spring Security fundamentals are stable and well tested
-- Add Redis with a concrete caching use case
+- Harden Redis testing so the full build does not depend on manually running a local Redis instance, for example through Testcontainers or a dedicated integration-test execution path
 - Add Kafka with a concrete transaction-processing use case
 - Refresh AWS through project work covering IAM, Secrets Manager, RDS/Aurora, S3, CloudWatch, VPC/security-group basics, ALB, and one practical container deployment path such as ECS/Fargate
 - Add a backend-focused AI learning track after core backend foundations: LLM fundamentals, Java/Spring integration, structured outputs/tool calling, embeddings/vector search or RAG only with a justified use case, plus AI security, PII, latency, cost, evaluation, and observability
@@ -776,4 +861,4 @@ For each topic:
 
 This repository represents hands-on learning and career-restart preparation.
 
-Technologies are listed here only after they have been used directly in exercises or project work. Current Java 21, JPA, MySQL, Flyway, Docker, and related work in this repository represents hands-on project practice and is kept distinct from professional experience.
+Technologies are listed here only after they have been used directly in exercises or project work. Current Java 21, JPA, MySQL, Flyway, Docker, Spring Security, Redis/Spring Cache, and related work in this repository represents hands-on project practice and is kept distinct from professional experience.

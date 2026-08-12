@@ -7,6 +7,7 @@ import com.prateek.learning.transaction.exception.TransactionNotFoundException;
 import com.prateek.learning.transaction.model.Transaction;
 import com.prateek.learning.transaction.model.TransactionType;
 import com.prateek.learning.transaction.repository.TransactionRepository;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -57,6 +58,7 @@ public class TransactionService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = "transactions", key = "#transactionId")
     public Transaction getTransactionById(String transactionId) {
         validateTransactionId(transactionId);
 

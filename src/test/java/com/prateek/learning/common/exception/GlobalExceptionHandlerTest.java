@@ -68,7 +68,7 @@ class GlobalExceptionHandlerTest {
     void shouldHandleUnexpectedExceptionWithoutExposingDetails() {
         ResponseEntity<ApiError> response =
                 handler.handleException(
-                        new RuntimeException("Database password exposed")
+                        new RuntimeException("Unexpected database failure")
                 );
 
         assertEquals(

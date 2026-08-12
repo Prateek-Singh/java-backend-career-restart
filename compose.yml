@@ -17,13 +17,22 @@ services:
     container_name: transaction-service
     depends_on:
       - mysql
+      - redis
     environment:
       SPRING_PROFILES_ACTIVE: jpa
       DB_URL: jdbc:mysql://mysql:3306/transaction_db
       DB_USERNAME: app_user
       DB_PASSWORD: app_password
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     ports:
       - "8080:8080"
+
+  redis:
+    image: redis:7.4
+    container_name: transaction-redis
+    ports:
+      - "6379:6379"
 
 volumes:
   mysql-data:
