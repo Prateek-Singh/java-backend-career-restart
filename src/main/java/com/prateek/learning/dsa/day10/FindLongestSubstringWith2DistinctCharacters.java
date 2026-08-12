@@ -1,4 +1,4 @@
-package com.prateek.learning.dsa.day09;
+package com.prateek.learning.dsa.day10;
 
 import java.util.HashMap;
 import java.util.Map;
