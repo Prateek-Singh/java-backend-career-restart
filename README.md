@@ -1,142 +1,247 @@
 # Java Backend Career Restart
 
-Hands-on Java backend refresh project focused on rebuilding current implementation depth and senior-level interview readiness through practical coding, testing, debugging, system design, SQL, DSA, and reliability work.
+This repository documents my structured return to hands-on Java backend engineering.
 
-## Current Project Stack
+It contains progressive exercises and a Spring Boot transaction API used to rebuild practical confidence in Java, testing, data structures and algorithms, SQL, REST API development, persistence, database migrations, and backend design.
 
-- Java 21
-- Spring Boot
-- Spring Web / REST
+## Current Focus
+
+- Core Java and modern Java practices
+- Collections, Streams, Optional, equality, and immutability
+- Exception handling and domain-specific exceptions
+- JUnit 5 and Mockito
+- Spring Boot REST APIs
+- Jakarta Bean Validation
+- MockMvc controller-slice testing
+- Spring Boot integration testing
 - Spring Data JPA
-- MySQL
-- Flyway
-- H2 for focused JPA integration testing
 - Spring Security
 - Spring Cache
+- Spring Data Redis
 - Redis
 - Spring Kafka
 - Apache Kafka
-- Docker / Docker Compose
 - Testcontainers
+- BCrypt password hashing
+- Relational persistence with MySQL
+- Flyway database migrations
+- Data structures and algorithms
+- SQL aggregation, joins, subqueries, and window functions
+- Backend layering and repository design
+- Idempotency and transaction-processing design
+- System design and interview preparation
+- Spring Security fundamentals
+- Stateless REST authentication
+- Authentication and authorization testing
+- Redis caching and cache-aside design
+- Cache resilience and graceful degradation
+- Kafka event publishing and partition-key design
+- Kafka integration testing with Testcontainers
+- Database/broker consistency and transactional-outbox design
+
+## Tech Stack Used in This Repository
+
+- Java 21
+- Maven
+- Spring Boot
+- Spring MVC
+- Spring Data JPA
+- Spring Security
+- Spring Cache
+- Spring Data Redis
+- Redis
+- Spring Kafka
+- Apache Kafka
+- Testcontainers
+- BCrypt password hashing
+- Jakarta Bean Validation
+- MySQL
+- H2
+- Flyway
+- Docker
+- Docker Compose
 - JUnit 5
 - Mockito
-- Maven
+- MockMvc
+- Git
 
-## Current API Domain
+Additional technologies are added only after they are used directly in hands-on exercises or project work.
 
-The project currently centers on transaction APIs with:
+## Current REST Endpoints
 
-- create transaction,
-- retrieve transaction by ID,
-- retrieve transactions by account ID,
-- validation and structured error responses,
-- duplicate transaction protection,
-- persistence through Spring Data JPA,
-- cache-aside transaction lookup,
-- authentication-protected transaction endpoints,
-- transaction-created event publishing to Kafka.
+### Get a transaction by ID
 
-## Persistence and Database
+```http
+GET /transactions/{transactionId}
+```
 
-Implemented:
+Returns:
 
-- Spring Data JPA repository layer,
-- MySQL persistence,
-- profile-based persistence configuration,
-- Flyway migrations,
-- H2-backed integration testing,
-- `Instant` timestamp persistence,
-- duplicate business-ID handling,
-- API `409 Conflict` behavior,
-- database uniqueness as the final concurrency guard,
-- service-level transaction boundaries and read-only intent where appropriate.
+- `200 OK` when the transaction exists
+- `400 Bad Request` when the transaction ID is invalid
+- `404 Not Found` when the transaction is missing
 
-## Docker and Local Infrastructure
+### Get transactions by account ID
 
-Docker Compose currently supports the infrastructure needed for hands-on local development, including MySQL, Redis, and Kafka.
+```http
+GET /transactions/account/{accountId}
+```
 
-The application has also been exercised with a multi-stage Docker build.
+Returns:
 
-Integration tests that need Redis or Kafka use Testcontainers so a normal `mvn clean test` does not require manually starting either broker/cache service.
+- `200 OK` with matching transactions
+- `200 OK` with an empty JSON array when there are no matches
 
-Docker itself must be available for those Testcontainers tests.
+The endpoint currently makes no ordering guarantee.
 
-## Spring Security
+### Create a transaction
 
-Current security milestone:
+```http
+POST /transactions
+Content-Type: application/json
+```
 
-- `/transactions/**` requires authentication,
-- stateless HTTP Basic authentication,
-- BCrypt password encoding,
-- in-memory USER / ADMIN identities for the current learning milestone,
-- authentication and authorization fundamentals,
-- explicit 401 behavior tests,
-- controller integration coverage.
+Example request:
 
-Deliberately deferred:
+```json
+{
+  "id": "TXN-123",
+  "accountId": "ACC-1111",
+  "amount": 35000.00,
+  "type": "CREDIT",
+  "description": "Monthly Savings"
+}
+```
 
-- JWT,
-- persisted users,
-- account/resource ownership authorization,
-- service-to-service authentication.
+Returns:
 
-These will be added only when the underlying domain and security contract justify them.
+- `201 Created` for a valid request
+- `400 Bad Request` for invalid input, malformed JSON, or an unsupported transaction type
+- `409 Conflict` when the business transaction ID already exists
 
-## Redis / Spring Cache
+The transaction ID acts as the business/idempotency identifier.
 
-First cache target:
+The service performs an early duplicate check for clear application behavior, while the database unique constraint on the transaction ID remains the final concurrency-safe guard. A confirmed duplicate unique-constraint violation is translated into a domain duplicate exception and exposed as `409 Conflict`.
 
-`GET /transactions/{transactionId}`
+Transactions are persisted through a `TransactionRepository` abstraction.
 
-Cache contract:
+After a successful save, the current Kafka learning implementation also builds and publishes a `TransactionCreatedEvent`. The database write and Kafka publish are intentionally still separate operations at this milestone; transactional outbox is planned as the stronger consistency design.
 
-- MySQL remains the source of truth.
-- Spring Cache provides cache-aside behavior.
-- Cache hit returns Redis data without querying MySQL.
-- Cache miss queries MySQL and caches a successful result.
-- Missing transactions are not negative-cached initially.
-- Cache TTL is 30 minutes.
-- Cache keys use a transaction namespace.
-- Cache values use JSON serialization.
-- Redis failures fail open to MySQL for reads.
-- Cache GET/PUT/EVICT/CLEAR failures are logged rather than propagated.
+## API Security
 
-Reliability lesson:
+All transaction endpoints currently require authentication.
 
-A cache outage may preserve correctness while still causing a real production incident through increased latency, DB traffic, connection pressure, and saturation.
+Protected paths include:
 
-### Redis Testing
+```text
+POST /transactions
+GET  /transactions/{transactionId}
+GET  /transactions/account/{accountId}
+```
 
-Coverage includes:
+The current learning implementation uses HTTP Basic authentication through Spring Security.
 
-- pure service unit tests,
-- Spring cache-proxy behavior,
-- cache error-handler tests,
-- real Redis serialization/cache-hit integration behavior,
-- Testcontainers-based Redis lifecycle.
+Security behavior is configured through `SecurityFilterChain`:
 
-A manually running Redis instance is not required for the full Maven test suite.
+- `/transactions/**` requires authentication
+- HTTP sessions are stateless
+- HTTP Basic is enabled
+- CSRF is disabled for the current stateless Authorization-header based authentication model
+
+The application currently uses an in-memory `UserDetailsService` with `USER` and `ADMIN` roles for security learning and testing.
+
+Passwords are hashed using BCrypt through Spring Security's `PasswordEncoder`.
+
+Current authentication behavior:
+
+```text
+missing credentials
+-> 401 Unauthorized
+
+invalid credentials
+-> 401 Unauthorized
+
+valid credentials
+-> request proceeds to controller/application logic
+```
+
+The intended authorization model is:
+
+```text
+USER
+-> access only their own accounts and transactions
+
+ADMIN
+-> access any account or transaction
+```
+
+Resource-level ownership authorization is intentionally deferred until the application has a genuine user/account ownership model. An artificial ownership mapping was not added only to demonstrate `403 Forbidden`.
+
+HTTP Basic is being used to establish and test the security fundamentals first. JWT/token-based authentication is planned only after the authentication/authorization model is stable.
+
+Because HTTP Basic credentials are Base64 encoded rather than encrypted, HTTPS/TLS is required for any real deployment.
+
+The active repository implementation depends on the Spring profile:
+
+- `in-memory` uses the in-memory repository
+- `jpa` uses the JPA-backed repository adapter
+
+
+## Redis Caching
+
+`GET /transactions/{transactionId}` is cached through Spring Cache with Redis when the JPA/Redis runtime configuration is active.
+
+This endpoint was chosen because transactions are effectively immutable after creation in the current API, which keeps invalidation simple.
+
+Current cache contract:
+
+```text
+Source of truth       MySQL
+Strategy              cache-aside
+Cache hit             return cached transaction and skip DB
+Cache miss            load from DB, cache the value, then return it
+Missing transaction   return 404; do not negative-cache initially
+TTL                   30 minutes
+Cache key             transactions::<transactionId>
+Value serialization   JSON
+Redis unavailable     fall back to MySQL
+```
+
+Redis is treated as a performance optimization rather than a hard dependency for transaction reads.
+
+A custom cache error handler logs Redis GET/PUT/EVICT/CLEAR failures without propagating them into the API request. When Redis is unavailable, a transaction read falls back to MySQL and can still return `200 OK` if the database is healthy.
+
+Short Redis connection/command timeouts are configured so fallback does not wait indefinitely.
+
+The failure trade-off is explicit: Redis outage preserves correctness, but latency and database load increase. If the database cannot absorb the redirected traffic, a cache outage can still become a production incident.
+
+Cache values use JSON rather than JDK-native serialization so they are easier to inspect and less tightly coupled to Java serialization.
+
+Not-found results are not cached initially. A missing transaction may be created later, so negative caching would require a deliberate short TTL and/or invalidation rule to avoid stale `404` responses.
+
+Cache-stampede and hot-key risks are understood but mitigation is deferred until a real scale requirement justifies it.
+
+The real Redis integration test now uses Testcontainers, so a manually started Redis instance is no longer required for the normal full Maven test suite. Docker must be available for the Testcontainers-based integration test.
+
 
 ## Kafka Transaction Events
 
-The first Kafka milestone is implemented.
+The first Kafka producer milestone is implemented for transaction creation.
 
-### Topic
+Current Kafka contract:
 
-`transaction-events`
+```text
+Topic                 transaction-events
+Local partitions      3
+Local replication     1
+Record key            transactionId
+Record value          TransactionCreatedEvent as JSON
+Producer              KafkaTemplate<String, TransactionCreatedEvent>
+```
 
-Local learning setup:
+`transactionId` is used as the Kafka record key so events for the same transaction are routed consistently to the same partition. Kafka ordering is partition-local rather than global across the whole topic.
 
-- 3 partitions
-- replication factor 1 on a single local broker
-
-Replication factor 1 is intentionally local-only and is not the production HA design.
-
-### Event
-
-`TransactionCreatedEvent`
-
-The event currently carries:
+`TransactionCreatedEvent` currently contains:
 
 - `eventId`
 - `eventType`
@@ -149,249 +254,730 @@ The event currently carries:
 
 `eventId` is deliberately separate from the business `transactionId`.
 
-### Partition Key
+Current create flow:
 
-Kafka records are published with:
+```text
+validate request
+-> save transaction
+-> build TransactionCreatedEvent
+-> publish to transaction-events
+-> return saved transaction
+```
 
-`transactionId` as the record key.
+This deliberately leaves the database/broker dual-write problem visible for learning: the database save can succeed while Kafka publication fails.
 
-This preserves ordering for events belonging to the same transaction while allowing different transactions to be distributed across partitions and processed in parallel.
+The planned stronger design is transactional outbox, where the business row and outbox event row are persisted in the same local database transaction and a separate publisher sends pending events to Kafka.
 
-Kafka ordering is partition-local, not global across the topic.
+Outbox publication can still produce duplicates if Kafka accepts an event and the publisher fails before recording publication success. Consumer-side idempotency using a stable `eventId` is therefore a planned reliability milestone.
 
-### Producer Flow
+Kafka integration testing uses Testcontainers and verifies a real round trip through:
 
-Current learning implementation:
+```text
+TransactionEventPublisher
+-> KafkaTemplate
+-> JSON serialization
+-> real Kafka broker
+-> real consumer
+-> JSON deserialization
+-> TransactionCreatedEvent
+```
+
+The integration test verifies both the Kafka record key and the consumed event payload.
+
+A manually started Kafka broker is not required for `mvn clean test`; Docker must be available for Testcontainers.
+
 
-`validate -> save transaction -> build TransactionCreatedEvent -> publish to Kafka -> return saved transaction`
+## Validation and Domain Rules
 
-`TransactionEventPublisher` uses:
+The HTTP boundary uses Jakarta Bean Validation.
 
-`KafkaTemplate<String, TransactionCreatedEvent>`
+Current request rules:
 
-with:
+- `id` must not be null or blank
+- `accountId` must not be null or blank
+- `amount` must not be null
+- `amount` must be greater than zero
+- `type` must not be null
+- `description` must not be null or blank
 
-- topic: `transaction-events`
-- key: transaction ID
-- payload: JSON `TransactionCreatedEvent`
+Important business invariants are also enforced in the service layer so non-HTTP callers cannot bypass them:
 
-### Known Dual-Write Limitation
+- transaction ID is required
+- account ID is required
+- amount must be positive
+- transaction type is required
 
-The current direct-publish milestone intentionally exposes an important distributed-systems problem:
+Description is currently enforced at the HTTP request boundary and is not treated as a service-level business invariant.
 
-1. MySQL commit succeeds.
-2. Kafka publish fails.
-3. The transaction exists but downstream consumers may never receive the event.
+Supported transaction types are represented by an enum:
 
-The stronger future design is a transactional outbox:
+```java
+public enum TransactionType {
+    CREDIT,
+    DEBIT,
+    TRANSFER,
+    REFUND
+}
+```
 
-- persist business row and outbox row in the same DB transaction,
-- asynchronously publish pending outbox events,
-- mark them published after successful broker send.
+Unsupported JSON values such as `"SALARY"` fail during deserialization and are mapped to `400 Bad Request`.
 
-Even with an outbox, duplicate publication is possible if Kafka accepts an event and the publisher crashes before recording publication success. Future consumers therefore need idempotent processing, ideally based on a stable `eventId`.
+## Exception Handling
 
-## Kafka Testing
+A global exception handler maps application failures to structured API responses.
 
-### Publisher Unit Test
+Handled cases include:
 
-Mocks `KafkaTemplate<String, TransactionCreatedEvent>` and verifies the expected topic, key, and payload are passed to KafkaTemplate.
+- transaction not found
+- duplicate transaction IDs
+- invalid arguments
+- invalid transaction amounts
+- Bean Validation failures
+- malformed request bodies
+- unsupported enum values
+- unexpected server errors
 
-### Transaction Service Unit Test
+Illustrative duplicate response:
 
-Captures the generated `TransactionCreatedEvent` and verifies its important event and business fields.
+```json
+{
+  "status": 409,
+  "error": "Conflict",
+  "message": "Transaction with id TXN-123 already exists"
+}
+```
 
-Duplicate transaction creation verifies that neither persistence nor event publication proceeds incorrectly.
+Illustrative validation response:
 
-### Controller Integration Test
+```json
+{
+  "status": 400,
+  "error": "Bad Request",
+  "message": "accountId cannot be null or blank"
+}
+```
 
-The Kafka publisher is replaced with `@MockitoBean` so the controller integration suite remains focused on HTTP/security/service/repository behavior.
+## Persistence Architecture
 
-### Real Kafka Integration Test
+The service depends on an application-facing repository abstraction rather than Spring Data directly.
 
-`TransactionEventPublisherIntegrationTest` uses Testcontainers to start a real Kafka broker.
+```text
+TransactionController
+        |
+        v
+TransactionService
+        |
+        v
+TransactionRepository
+        |
+        v
+JpaTransactionRepositoryAdapter
+        |
+        +--> TransactionEntityMapper
+        |
+        v
+SpringDataTransactionRepository
+        |
+        v
+MySQL
+```
 
-It verifies the complete round trip:
+The persistence implementation keeps the domain model separate from JPA-specific concerns.
 
-`TransactionEventPublisher -> KafkaTemplate -> JsonSerializer -> Kafka -> consumer -> JsonDeserializer -> TransactionCreatedEvent`
+### Domain model
 
-The test confirms:
+`Transaction` represents the application/domain view of a transaction.
 
-- a record reaches Kafka,
-- the Kafka key is the expected transaction ID,
-- the deserialized event matches the event that was published.
+### Persistence entity
 
-The test also exposed and corrected a real serializer configuration issue that mocked tests could not detect.
+`TransactionEntity` represents the relational persistence model.
 
-A manually started Kafka broker is not required for `mvn clean test`.
+Important persistence choices:
 
-## Messaging Concepts Reinforced
+- internal UUID primary key
+- unique business `transactionId`
+- `BigDecimal` mapped to `DECIMAL(19,2)`
+- enum stored using string representation
+- `Instant` used for transaction timestamps
+- nullable description
 
-### Kafka
+The UUID primary key is persistence-specific, while `transactionId` remains the business and idempotency identifier.
 
-Current understanding covers:
+## Repository Implementations
 
-- topics,
-- partitions,
-- partition-local ordering,
-- keys,
-- consumer groups,
-- offsets,
-- consumer lag,
-- rebalancing,
-- retention and replay,
-- at-least-once delivery,
-- duplicate processing,
-- idempotent consumers,
-- bounded retries,
-- dead-letter topics,
-- poison-message ordering trade-offs.
+The project currently has two implementations of `TransactionRepository`.
 
-### RabbitMQ
+### In-memory implementation
 
-Refreshed:
+Used with:
 
-- exchanges,
-- queues,
-- bindings,
-- routing keys,
-- acknowledgements,
-- DLX / DLQ,
-- competing consumers.
+```text
+in-memory
+```
 
-### RabbitMQ vs Kafka
+This supports lightweight application and test scenarios without requiring a database.
 
-General selection principle:
+### JPA implementation
 
-Choose RabbitMQ when queue-oriented delivery, acknowledgements, commands/tasks, and routing through exchanges/bindings are the primary requirements.
+Used with:
 
-Choose Kafka when durable retained event streams, replay, partition-based parallelism, and multiple independent consumer groups are the primary requirements.
+```text
+jpa
+```
 
-The choice should be driven by delivery semantics, retention/replay, routing, ordering scope, and consumer independence rather than product popularity.
+The JPA implementation consists of:
 
-## DSA Progress
+- `JpaTransactionRepositoryAdapter`
+- `TransactionEntityMapper`
+- `TransactionEntity`
+- `SpringDataTransactionRepository`
 
-Current practice is attempt-first and completed inside the study session.
+Spring profiles are used so only one repository implementation is active at a time.
 
-Before coding each problem, explicitly state:
+## Database and Schema Management
 
-- pattern,
-- why it fits,
-- state,
-- invariant,
-- invalid condition,
-- repair rule,
-- answer-update point,
-- edge cases.
+MySQL is used for the real relational persistence path.
 
-Recent sliding-window work includes:
+Flyway owns database schema creation and evolution.
 
-- longest substring without repeating characters,
-- at most two distinct characters,
-- longest repeating character replacement,
-- Max Consecutive Ones III.
+Migration scripts are stored under:
 
-Current reinforcement area:
+```text
+src/main/resources/db/migration
+```
 
-Translate a recognized pattern into precise state transitions, especially when shrinking or repairing a window.
+The initial migration is:
 
-## SQL Progress
+```text
+V1__create_transactions_table.sql
+```
 
-Recent reinforcement includes:
+Flyway maintains migration history in:
 
-- conditional aggregation,
-- `GROUP BY`,
-- `HAVING`,
-- date-range filtering,
-- top-N queries,
-- deterministic ordering,
-- window functions.
+```text
+flyway_schema_history
+```
 
-Window-function distinctions retained:
+Hibernate is configured with:
 
-- `ROW_NUMBER()` - unique sequential number,
-- `RANK()` - ties share rank and leave gaps,
-- `DENSE_RANK()` - ties share rank without gaps.
+```yaml
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+```
 
-## System Design and Reliability
+This means:
 
-Current active concepts include:
+```text
+Flyway
+→ creates and changes the schema
 
-- database transaction boundaries,
-- race-safe uniqueness,
-- idempotency,
-- retry and acknowledgement behavior,
-- cache-aside,
-- TTL and invalidation,
-- negative caching,
-- cache stampede,
-- hot keys,
-- graceful degradation,
-- broker delivery semantics,
-- partition ordering,
-- consumer groups and lag,
-- DB/broker dual-write failure,
-- transactional outbox,
-- idempotent consumers,
-- retry / dead-letter handling.
+Hibernate
+→ validates that entity mappings match the schema
+```
 
-System design is treated as a daily track and connected directly to implementation work.
+Hibernate does not own schema evolution.
 
-## Testing Strategy
+Open Session in View is disabled:
 
-The project deliberately separates test responsibilities:
+```yaml
+spring:
+  jpa:
+    open-in-view: false
+```
 
-- unit tests for mapping/business logic and collaborator interaction,
-- Spring-focused tests when framework proxies or configuration matter,
-- controller integration tests for HTTP/security/persistence behavior,
-- real infrastructure integration tests for Redis/Kafka serialization and communication,
-- Testcontainers to keep infrastructure tests self-contained.
+## Database Configuration
 
-## Current Roadmap
+Runtime database values are read from environment variables rather than being stored directly in application configuration.
 
-Completed major milestones:
+Required variables:
 
-1. Core Java / collections / streams / exception refresh.
-2. Spring Boot REST API foundation.
-3. Validation and structured exception handling.
-4. JPA + MySQL.
-5. Flyway + H2 integration testing.
-6. Docker / Docker Compose foundation.
-7. Duplicate handling + DB uniqueness + Spring transaction boundaries.
-8. Spring Security fundamentals.
-9. Redis / Spring Cache with graceful database fallback.
-10. Self-contained Redis integration testing with Testcontainers.
-11. Kafka fundamentals, RabbitMQ comparison, transaction-event producer, and real Kafka integration testing.
+```text
+DB_URL
+DB_USERNAME
+DB_PASSWORD
+```
 
-Next areas will continue incrementally rather than adding technologies only for checklist value. Likely follow-up work includes:
+Example local values:
 
-- Kafka consumer-side reliability and idempotency,
-- transactional outbox,
-- event retry/dead-letter implementation,
-- schema evolution,
-- AWS hands-on refresh/deployment,
-- observability,
-- Kubernetes / CI-CD refresh,
-- backend-focused AI when justified.
+```bash
+export DB_URL="jdbc:mysql://localhost:3306/transaction_db"
+export DB_USERNAME="app_user"
+export DB_PASSWORD="app_password"
+```
 
-## Build and Test
+The `jpa` runtime profile reads these values through Spring configuration.
 
-Run:
+JPA integration tests use H2 through test-specific configuration, so MySQL is not required for the normal Maven test suite.
+
+## Running the Application and MySQL with Docker Compose
+
+The repository includes a multi-stage `Dockerfile` for the Spring Boot application and a root-level `compose.yml` that supports the application together with MySQL, Redis, and Kafka for local development.
+
+The application container connects to infrastructure through Docker Compose service discovery using service names such as `mysql`, `redis`, and `kafka` rather than `localhost`.
+
+```text
+jdbc:mysql://mysql:3306/transaction_db
+```
+
+Inside a container, `localhost` refers to that same container, so Compose service names are used instead of `localhost` for application-to-database and application-to-Redis traffic.
+
+Build and start the full stack:
+
+```bash
+docker compose up --build
+```
+
+Run in detached mode when startup logs do not need to remain attached:
+
+```bash
+docker compose up --build -d
+```
+
+Check status:
+
+```bash
+docker compose ps
+```
+
+Stop the Compose services while preserving the MySQL volume:
+
+```bash
+docker compose stop
+```
+
+Start the existing containers again:
+
+```bash
+docker compose start
+```
+
+The MySQL named volume preserves transaction data across `stop` / `start` cycles. Avoid:
+
+```bash
+docker compose down -v
+```
+
+unless the local database volume should intentionally be deleted.
+
+`depends_on` controls startup order but does not by itself guarantee that MySQL is ready to accept connections. A database health check is a planned hardening improvement.
+
+## Running the Project
+
+### Run all tests
 
 ```bash
 mvn clean test
 ```
 
-Redis and Kafka integration tests use Testcontainers. Docker must be running, but manually started Redis/Kafka containers are not required.
+Docker must be running because the Redis and Kafka integration tests use Testcontainers. Manually started Redis and Kafka containers are not required.
 
-## Working Principle
+### Run using the in-memory repository
 
-Technology is added only when there is:
+Activate the `in-memory` profile when required by the local setup.
 
-- a credible use case,
-- a working implementation,
-- focused tests,
-- clear failure-mode reasoning,
-- an interview-ready explanation of the trade-offs.
+### Run using MySQL/JPA
 
-The project is intended to demonstrate verified current hands-on work, not inflate professional experience claims.
+Ensure MySQL is running and database environment variables have been exported.
+
+Then start the application with:
+
+```bash
+mvn spring-boot:run -Dspring-boot.run.profiles=jpa
+```
+
+The application runs on the default Spring Boot port:
+
+```text
+http://localhost:8080
+```
+
+On startup with the JPA profile:
+
+1. Flyway validates migration history.
+2. Flyway applies any pending migrations.
+3. Hibernate validates the entity mappings against the database schema.
+4. Spring Boot starts the REST application.
+
+## Repository Structure
+
+```text
+src/
+├── main/
+│   ├── java/com/prateek/learning/
+│   │   ├── CareerRestartApplication.java
+│   │   ├── common/
+│   │   │   └── exception/
+│   │   ├── dsa/
+│   │   │   ├── day01/
+│   │   │   ├── day02/
+│   │   │   ├── day03/
+│   │   │   ├── day04/
+│   │   │   ├── day05/
+│   │   │   ├── day06/
+│   │   │   ├── day07/
+│   │   │   ├── day08/
+│   │   │   ├── day09/
+│   │   │   ├── day10/
+│   │   │   ├── day11/
+│   │   │   └── day12/
+│   │   ├── java/
+│   │   │   ├── day01/
+│   │   │   ├── day02/
+│   │   │   └── day03/
+│   │   ├── kafka/
+│   │   │   ├── event/
+│   │   │   └── producer/
+│   │   └── transaction/
+│   │       ├── config/
+│   │       ├── controller/
+│   │       ├── dto/
+│   │       ├── exception/
+│   │       ├── model/
+│   │       ├── repository/
+│   │       ├── service/
+│   │       └── persistence/
+│   │           ├── adapter/
+│   │           ├── entity/
+│   │           ├── mapper/
+│   │           └── repository/
+│   └── resources/
+│       ├── application-jpa.yml
+│       └── db/
+│           └── migration/
+│               └── V1__create_transactions_table.sql
+│
+└── test/
+    ├── java/com/prateek/learning/
+    │   ├── dsa/
+    │   ├── java/
+    │   ├── kafka/
+    │   │   └── producer/
+    │   └── transaction/
+    │       ├── controller/
+    │       ├── service/
+    │       └── persistence/
+    │           └── adapter/
+    └── resources/
+        └── application-jpa.yml
+
+notes/
+├── day-01.md
+├── day-02.md
+├── day-03.md
+├── day-04.md
+├── day-05.md
+├── day-06.md
+├── day-07.md
+├── day-08.md
+├── day-09.md
+├── day-10.md
+├── day-11.md
+└── day-12.md
+```
+
+## Testing Approach
+
+The project separates tests by responsibility.
+
+- **Repository unit tests** verify repository contracts and lookup behaviour.
+- **Service unit tests** verify business rules and repository delegation.
+- **Controller-slice tests** use `@WebMvcTest`, `MockMvc`, and a mocked service.
+- **Security controller tests** verify unauthenticated, invalid-credential, and authenticated request behavior.
+- **Application integration tests** verify request-to-repository behaviour through the Spring context.
+- **JPA integration tests** verify the adapter, mapper, Spring Data repository, and relational persistence path using H2.
+- **Exception-handler tests** verify structured API error responses.
+- **Cache-proxy tests** verify that repeated service lookups are intercepted by Spring caching and avoid repeated repository calls.
+- **Redis cache error-handler tests** verify cache failures are logged/swallowed rather than rethrown.
+- **Redis integration tests** verify real Redis JSON serialization, cache writes, cache reads, and repository bypass on cache hit using Testcontainers.
+- **Kafka publisher unit tests** verify the expected topic, transaction-ID key, and event payload passed to `KafkaTemplate`.
+- **Kafka integration tests** verify real JSON serialization, broker communication, Kafka record key, and event deserialization using Testcontainers.
+- **DSA tests** cover happy paths, edge cases, invalid input, duplicates, ties, and ordering assumptions.
+
+Invalid HTTP requests are tested to confirm that:
+
+- `400 Bad Request` is returned
+- the expected validation message is included
+- the service layer is not called
+
+Security tests verify that:
+
+- missing authentication returns `401 Unauthorized`
+- invalid HTTP Basic credentials return `401 Unauthorized`
+- valid credentials allow the request to proceed to controller behavior
+- authentication failures are rejected before the service layer is invoked
+- controller-slice tests load the intended application `SecurityConfig`
+- integration tests authenticate explicitly before exercising secured transaction flows
+
+The JPA integration tests verify:
+
+- saving transactions
+- retrieving a transaction by business transaction ID
+- retrieving transactions by account ID
+- domain-to-entity mapping
+- entity-to-domain mapping
+- database-backed round trips
+- duplicate business transaction IDs are rejected by the database unique constraint
+- the expected unique-constraint violation is translated into `DuplicateTransactionException`
+
+## Progress Summary
+
+### Day 1
+
+- Java Streams, Collectors, Optional, Comparator, and BigDecimal
+- Transaction service exercises
+- Two Sum
+- Contains Duplicate
+- JUnit tests
+
+### Day 2
+
+- `equals()`, `hashCode()`, and `HashSet`
+- Mutable-key behavior
+- Valid Anagram
+- SQL aggregation
+- Interview speaking practice
+
+### Day 3
+
+- Checked and unchecked exceptions
+- Custom exceptions
+- Immutable class and Java record
+- Defensive copying
+- Group Anagrams
+- SQL joins
+- Global Spring Boot exception handling
+
+### Day 4
+
+- Constructor injection and controller-service separation
+- Spring Boot application setup
+- GET and POST transaction endpoints
+- MockMvc controller-slice tests
+- Direct service unit tests
+- Top K Frequent Elements using a size-limited min-heap
+- SQL subqueries and window functions
+
+### Day 5
+
+- Introduced the `TransactionRepository` abstraction
+- Added an in-memory repository implementation
+- Persisted newly created transactions
+- Retrieved created transactions by transaction ID
+- Added repository, service, controller, and integration coverage
+- Practised heap and `PriorityQueue` concepts
+
+### Day 6
+
+- Added repository-backed transaction retrieval by account ID
+- Added Jakarta Bean Validation to transaction requests
+- Mapped validation and deserialization failures to structured `400 Bad Request` responses
+- Introduced `TransactionType` for type-safe domain representation
+- Added controller tests proving invalid requests do not reach the service layer
+- Added integration coverage for account-based transaction retrieval
+- Implemented K Closest Points to Origin using a size-limited max-heap
+- Practised SQL aggregation using `WHERE`, `GROUP BY`, `HAVING`, `ORDER BY`, and `LIMIT`
+
+### Day 7
+
+- Refactored duplicated service validation into focused private methods
+- Removed obsolete sample transaction state from the service
+- Reviewed layered validation across REST, Kafka, scheduled jobs, and internal callers
+- Reviewed retry, acknowledgement, idempotency, and database uniqueness behaviour
+- Implemented K Largest Elements using a bounded min-heap
+- Practised SQL aggregation with `WHERE`, `GROUP BY`, `HAVING`, and `ORDER BY`
+- Added Spring Data JPA
+- Added a dedicated persistence entity separate from the domain model
+- Added domain-to-entity and entity-to-domain mapping
+- Added a JPA repository adapter behind the existing `TransactionRepository` abstraction
+- Added profile-based selection between in-memory and JPA repositories
+- Migrated transaction timestamps from `LocalDateTime` to `Instant`
+- Added H2-backed JPA integration tests
+- Added local MySQL through Docker Compose
+- Moved runtime database credentials to environment variables
+- Added Flyway and the first versioned migration
+- Switched Hibernate from schema updates to schema validation
+- Disabled Open Session in View
+- Verified Flyway migration history and MySQL-backed application startup
+
+
+### Day 8
+
+- Reviewed the full persistence path without notes: controller -> service -> application repository -> JPA adapter -> mapper -> Spring Data repository -> MySQL
+- Reinforced Flyway versus Hibernate responsibilities, persistence UUID versus business transaction ID, database uniqueness, and `Instant` for global timestamps
+- Added a multi-stage `Dockerfile` using Maven/Java 21 for the build stage and a Java 21 JRE runtime stage
+- Built and ran the Spring Boot application as a Docker image
+- Extended `compose.yml` so the Spring Boot application and MySQL run in the same Compose stack
+- Used Docker service discovery with `mysql` as the database hostname inside the application container
+- Verified POST and GET transaction requests through the containerized application and JPA/MySQL persistence path
+- Verified MySQL data survives `docker compose stop` / `docker compose start` through the named volume
+- Reviewed concurrent duplicate transaction handling: application existence checks can race, while the database unique constraint is the final concurrency-safe guard
+- Discussed REST duplicate behavior as `409 Conflict` and asynchronous duplicate handling as idempotent acknowledgement
+- Discussed service-level `@Transactional` boundaries for a complete unit of work
+- Implemented Merge Intervals using sorting plus greedy merging in `O(n log n)` time
+- Added parameterized Merge Intervals tests and used a defensive deep copy to avoid mutating caller-owned interval arrays
+- Learned SQL conditional aggregation using `SUM(CASE WHEN ... THEN ... ELSE ... END)` and reinforced `HAVING` for post-group filtering
+- Practised an interview explanation of why the service depends on an application-facing `TransactionRepository` abstraction rather than Spring Data JPA directly
+
+
+### Day 9
+
+- Implemented explicit duplicate transaction behavior with `409 Conflict`
+- Added `DuplicateTransactionException`
+- Added service-level early duplicate detection for a cleaner application failure path
+- Kept the database unique constraint on the business transaction ID as the final concurrency-safe duplicate guard
+- Updated the JPA adapter to translate the expected transaction-ID unique-constraint violation into the domain duplicate exception
+- Used `saveAndFlush()` so persistence violations can be classified before the adapter returns; flush remains separate from transaction commit
+- Updated H2 JPA tests to use the Flyway-managed schema with Hibernate `ddl-auto=validate`
+- Aligned UUID handling in H2 with the Flyway `BINARY(16)` schema
+- Added Spring service-level `@Transactional` boundaries and `readOnly = true` for read operations where appropriate
+- Added service, exception-handler, JPA integration, and REST integration coverage for duplicate behavior
+- Reviewed client retries, asynchronous redelivery, acknowledgement ordering, failure classification, and idempotent processing
+- Implemented Longest Substring Without Repeating Characters using an `O(n)` sliding window with a `HashSet`
+- Added parameterized tests for the sliding-window solution, including empty and null input
+- Reinforced SQL conditional aggregation, conditional counting, credit/debit totals, net amount, and `HAVING`
+- Practised a concise interview explanation of an idempotent transaction-creation API
+- Full `mvn clean test` passed
+
+### Day 9 Closure Snapshot
+
+- Focused study time: 3 hours 15 minutes
+- Confidence: Spring/JPA 8/10; Testing 8/10; SQL 8/10; DSA 6/10; System Design 7/10; Docker/Compose 7/10
+- `mvn clean test` passed
+- Day 9 changes committed and pushed
+- Duplicate transaction handling and service transaction boundaries are complete for the current milestone
+- DSA coaching will now include pattern revision, pattern discussion before coding, and one related take-home problem at day closure
+
+### Day 10
+
+- Completed the Day 9 take-home problem: Longest Substring With At Most Two Distinct Characters using a sliding window plus character-frequency map
+- Reinforced why frequency state requires a `HashMap` rather than only a `HashSet`
+- Revised DSA recognition across hash/map lookup, frequency maps, heap/top-K, sorting + greedy intervals, and sliding window
+- Reinforced `saveAndFlush()` versus transaction commit, transaction atomicity versus concurrent uniqueness, `readOnly = true`, and commit-before-acknowledgement behavior
+- Added Spring Security and Spring Security test support
+- Added a custom `SecurityFilterChain`
+- Protected `/transactions/**` behind authentication
+- Configured stateless HTTP sessions using `SessionCreationPolicy.STATELESS`
+- Enabled HTTP Basic for the first security-learning implementation
+- Disabled CSRF specifically for the current stateless Authorization-header authentication model
+- Added BCrypt password hashing through `PasswordEncoder`
+- Added temporary in-memory `USER` and `ADMIN` identities through `UserDetailsService`
+- Debugged an incorrect `/transaction/**` security matcher that had allowed the real `/transactions/**` endpoints to fall through to `permitAll()`
+- Updated controller-slice and application integration tests to authenticate explicitly
+- Added focused tests for missing credentials, invalid credentials, and successful authenticated access
+- Verified authentication failures are rejected before the service layer is invoked
+- Designed USER ownership versus ADMIN unrestricted-access authorization but deliberately deferred implementation until a genuine user/account ownership model exists
+- Reviewed `401 Unauthorized`, `403 Forbidden`, `404 Not Found`, and `503 Service Unavailable` security/failure semantics
+- Reviewed TLS requirements, sensitive authentication logging, identity-provider failure behavior, and stateless horizontal scaling
+- Reinforced SQL conditional aggregation and conditional `HAVING` for accounts with at least three CREDIT transactions
+- Practised a concise Spring Security interview explanation
+- Full `mvn clean test` passed
+
+### Day 10 Closure Snapshot
+
+- Focused study time: 2 hours 30 minutes
+- Confidence: Spring/Security 6/10; Testing 8/10; SQL 8/10; DSA 7/10; System Design 7/10; Docker/Compose 8/10
+- Full `mvn clean test` passed
+- Day 10 changes were committed and pushed
+
+
+### Day 11
+
+- Completed Longest Repeating Character Replacement using a sliding window plus character-frequency map
+- Reinforced DSA state, invariant, invalid-window condition, repair rule, answer update timing, and edge-case validation before coding
+- Corrected the `k == 0` edge case and an incorrect map/index lookup in the initial implementation
+- Reinforced the monotonic/stale `maxFrequency` optimization and the distinction between exact-current-window validity and maximum-length correctness
+- Changed the DSA workflow so new DSA problems are completed inside the study session rather than routinely assigned as take-home work
+- Completed no-notes Spring Security retrieval covering authentication/authorization, filter-chain flow, `SecurityContext`, `UserDetailsService`, BCrypt, `401`/`403`, statelessness, CSRF reasoning, and deliberate JWT deferral
+- Designed Redis caching before implementation and chose `GET /transactions/{transactionId}` because transactions are effectively immutable in the current API
+- Added Spring Cache and Spring Data Redis dependencies
+- Added Redis 7.4 to Docker Compose and verified connectivity with `redis-cli ping`
+- Added cache-aside transaction lookup with a 30-minute TTL and namespaced transaction keys
+- Configured Redis cache values to use JSON serialization rather than JDK-native serialization
+- Improved unexpected-exception logging while keeping the client `500` response generic
+- Diagnosed the original Redis `SerializationException` from the default JDK serializer
+- Added short Redis connection/command timeouts
+- Added a custom `RedisCacheErrorHandler` so cache failures degrade to MySQL instead of failing the API
+- Manually verified Redis-down behavior: cache GET failure -> MySQL query -> cache PUT failure -> HTTP `200`
+- Reviewed cache stampede, hot keys, negative caching, TTL/invalidation trade-offs, and cache-outage DB pressure
+- Added `TransactionServiceCacheTest` to prove two service lookups result in one repository lookup through Spring's cache proxy
+- Added `RedisCacheErrorHandlerTest` for GET, PUT, EVICT, and CLEAR failure behavior
+- Added a focused real-Redis integration test proving JSON serialization and repository bypass on the second lookup
+- Reinforced SQL conditional aggregation and `HAVING` for accounts with at least three CREDIT transactions
+- Full `mvn clean test` passed with Redis available for the real Redis integration test
+
+### Day 11 Closure Snapshot
+
+- DSA completed in-session; no routine DSA take-home will be assigned going forward
+- Spring Security retrieval completed
+- Redis cache foundation and graceful-degradation behavior completed
+- Cache-proxy, cache error-handler, and real Redis integration tests passed
+- SQL reinforcement completed
+- Full `mvn clean test` passed
+- Git commit/push pending at the time of README generation
+
+
+
+### Day 12
+
+- Made the Redis integration test self-contained with Testcontainers so the full Maven build no longer depends on a manually running Redis instance
+- Completed Max Consecutive Ones III using an `O(n)` sliding window and reinforced precise zero-count bookkeeping during window repair
+- Learned Kafka fundamentals: topics, partitions, consumer groups, offsets, lag, rebalancing, retention/replay, partition-local ordering, and at-least-once delivery
+- Refreshed RabbitMQ exchanges, queues, bindings, routing keys, acknowledgements, DLX/DLQ, and RabbitMQ-versus-Kafka trade-offs
+- Designed `transaction-events` with three local partitions and `transactionId` as the Kafka record key
+- Added Spring Kafka and `TransactionCreatedEvent`
+- Added `TransactionEventPublisher` using `KafkaTemplate<String, TransactionCreatedEvent>`
+- Integrated event publication after successful transaction persistence
+- Added publisher unit tests and transaction-service event assertions
+- Kept controller integration tests isolated from Kafka using `@MockitoBean`
+- Added Kafka Testcontainers support and a real producer-to-consumer integration test
+- Diagnosed and fixed a producer serialization mismatch exposed by the real Kafka integration test
+- Verified the Kafka integration test is self-contained by stopping the manually running broker and passing `mvn clean test`
+- Reviewed the DB/Kafka dual-write problem, transactional outbox, duplicate publication, and consumer idempotency
+- Practised SQL date-range aggregation, `HAVING`, deterministic ordering, and `ROW_NUMBER` / `RANK` / `DENSE_RANK`
+- Full `mvn clean test` passed
+
+### Day 12 Closure Snapshot
+
+- Focused study time: 5 hours
+- Confidence: Kafka 6/10; RabbitMQ 6/10; Testing 7/10; SQL 7/10; DSA 7/10; System Design 7/10; Redis/Security 7/10; Docker/Compose 8/10
+- Final `mvn clean test` passed with the manually started Kafka broker stopped
+- Redis and Kafka integration tests are self-contained with Testcontainers
+- Day 12 code, tests, notes, and documentation were committed and pushed
+
+## Learning Approach
+
+For each topic:
+
+1. Understand the requirement and assumptions.
+2. Write an initial solution.
+3. Review correctness and edge cases.
+4. Improve design or complexity.
+5. Add focused tests.
+6. Record key learnings.
+7. For DSA, complete pattern recognition, manual walkthrough, implementation, review, complexity, edge cases, and tests inside the study session unless take-home work is explicitly requested.
+8. Commit and push completed work.
+
+## Next Planned Improvements
+
+- Add database-backed integration testing against MySQL where it provides value
+- Review the current Flyway version against MySQL 8.4 compatibility
+- Continue SQL practice using the relational transaction schema
+- Continue in-session DSA practice with explicit state/invariant reasoning across current patterns before expanding further
+- Continue system-design exercises around transaction processing and idempotency
+- Extend Spring Security from the current HTTP Basic authentication foundation to credible resource-level authorization once user/account ownership is modelled
+- Add JWT/token authentication only after the current Spring Security fundamentals are stable and well tested
+- Continue reinforcing Redis failure behaviour and cache design through retrieval rather than adding unnecessary cache features
+- Implement the first Kafka consumer milestone after reviewing consumer groups, partition assignment, offsets, failure/redelivery, and idempotency
+- Add consumer-side idempotency, retry/backoff, dead-letter handling, and transactional outbox incrementally after the basic consumer path is clear and tested
+- Refresh AWS through project work covering IAM, Secrets Manager, RDS/Aurora, S3, CloudWatch, VPC/security-group basics, ALB, and one practical container deployment path such as ECS/Fargate
+- Add a backend-focused AI learning track after core backend foundations: LLM fundamentals, Java/Spring integration, structured outputs/tool calling, embeddings/vector search or RAG only with a justified use case, plus AI security, PII, latency, cost, evaluation, and observability
+- Add API documentation
+- Add observability and production-style logging incrementally
+
+## Project Positioning
+
+This repository represents hands-on learning and career-restart preparation.
+
+Technologies are listed here only after they have been used directly in exercises or project work. Current Java 21, JPA, MySQL, Flyway, Docker, Spring Security, Redis/Spring Cache, Kafka, Testcontainers, and related work in this repository represents hands-on project practice and is kept distinct from professional experience.
