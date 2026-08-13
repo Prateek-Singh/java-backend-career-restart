@@ -15,14 +15,14 @@ class MergeIntervalTest {
     private final MergeInterval mergeInterval = new MergeInterval();
 
     @ParameterizedTest
-    @MethodSource("mergeIntervals")
+    @MethodSource("testCases")
     void shouldMergeIntervals(int[][] input, int[][] expected) {
         int[][] result = mergeInterval.merge(input);
 
         assertThat(result).isDeepEqualTo(expected);
     }
 
-    static Stream<Arguments> mergeIntervals() {
+    static Stream<Arguments> testCases() {
         return Stream.of(
                 Arguments.of(
                         new int[][]{{1, 3}, {2, 6}, {8, 10}, {15, 18}},

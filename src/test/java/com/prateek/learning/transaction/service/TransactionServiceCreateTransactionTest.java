@@ -1,5 +1,6 @@
 package com.prateek.learning.transaction.service;
 
+import com.prateek.learning.kafka.producer.TransactionEventPublisher;
 import com.prateek.learning.transaction.dto.CreateTransactionRequest;
 import com.prateek.learning.transaction.exception.InvalidTransactionAmountException;
 import com.prateek.learning.transaction.model.Transaction;
@@ -7,18 +8,27 @@ import com.prateek.learning.transaction.model.TransactionType;
 import com.prateek.learning.transaction.repository.InMemoryTransactionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@ExtendWith(MockitoExtension.class)
 class TransactionServiceCreateTransactionTest {
 
     private TransactionService transactionService;
 
+    private InMemoryTransactionRepository repository = new InMemoryTransactionRepository();
+
+    @Mock
+    private TransactionEventPublisher eventPublisher;
+
     @BeforeEach
     void setUp() {
-        transactionService = new TransactionService(new InMemoryTransactionRepository());
+        transactionService = new TransactionService(repository, eventPublisher);
     }
 
     @Test

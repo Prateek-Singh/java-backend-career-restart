@@ -2,6 +2,7 @@ package com.prateek.learning.transaction.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.prateek.learning.common.exception.RedisCacheErrorHandler;
+import com.prateek.learning.kafka.producer.TransactionEventPublisher;
 import com.prateek.learning.transaction.config.CacheConfig;
 import com.prateek.learning.transaction.model.Transaction;
 import com.prateek.learning.transaction.model.TransactionType;
@@ -72,9 +73,14 @@ class TransactionServiceRedisIntegrationTest {
         }
 
         @Bean
+        TransactionEventPublisher transactionEventPublisher() {
+            return mock(TransactionEventPublisher.class);
+        }
+
+        @Bean
         TransactionService transactionService(
-                TransactionRepository transactionRepository) {
-            return new TransactionService(transactionRepository);
+                TransactionRepository transactionRepository, TransactionEventPublisher transactionEventPublisher) {
+            return new TransactionService(transactionRepository, transactionEventPublisher);
         }
 
         @Bean

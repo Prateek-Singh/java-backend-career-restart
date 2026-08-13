@@ -1,6 +1,8 @@
 package com.prateek.learning.transaction.service;
 
 import com.prateek.learning.common.exception.DuplicateTransactionException;
+import com.prateek.learning.kafka.event.TransactionCreatedEvent;
+import com.prateek.learning.kafka.producer.TransactionEventPublisher;
 import com.prateek.learning.transaction.dto.CreateTransactionRequest;
 import com.prateek.learning.transaction.model.Transaction;
 import com.prateek.learning.transaction.model.TransactionType;
@@ -31,6 +33,9 @@ class TransactionServiceTest {
     @Mock
     private TransactionRepository transactionRepository;
 
+    @Mock
+    private TransactionEventPublisher transactionEventPublisher;
+
     @Test
     void shouldSaveMappedTransactionAndReturnRepositoryResultWhenRequestIsValid() {
 
@@ -44,7 +49,14 @@ class TransactionServiceTest {
                 "Monthly EMI"
         );
 
-        Transaction repositoryResult = new Transaction();
+        Transaction repositoryResult = new Transaction(
+                request.id(),
+                request.accountId(),
+                request.amount(),
+                request.type(),
+                request.description(),
+                Instant.now()
+        );
 
         when(transactionRepository.save(any(Transaction.class)))
                 .thenReturn(repositoryResult);
@@ -64,6 +76,25 @@ class TransactionServiceTest {
         assertEquals(request.description(), transaction.getDescription());
         assertNotNull(transaction.getTimestamp());
         assertSame(repositoryResult, result);
+
+        ArgumentCaptor<TransactionCreatedEvent> eventCaptor =
+                ArgumentCaptor.forClass(TransactionCreatedEvent.class);
+
+        verify(transactionEventPublisher).publish(eventCaptor.capture());
+
+        TransactionCreatedEvent event = eventCaptor.getValue();
+
+        assertNotNull(event.eventId());
+        assertEquals("TRANSACTION_CREATED", event.eventType());
+        assertNotNull(event.eventTimestamp());
+
+        assertEquals(request.id(), event.transactionId());
+        assertEquals(request.accountId(), event.accountId());
+        assertEquals(request.amount(), event.amount());
+        assertEquals(request.type(), event.transactionType());
+        assertEquals(repositoryResult.getTimestamp(), event.transactionCreatedAt());
+
+        verify(transactionRepository).findById(request.id());
     }
 
     @Test
@@ -141,5 +172,6 @@ class TransactionServiceTest {
                 .hasMessage("Transaction with id " + request.id() + " already exists");
 
         verify(transactionRepository, never()).save(any(Transaction.class));
+        verifyNoInteractions(transactionEventPublisher);
     }
 }

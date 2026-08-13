@@ -1,6 +1,7 @@
 package com.prateek.learning.transaction.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.prateek.learning.kafka.producer.TransactionEventPublisher;
 import com.prateek.learning.transaction.dto.CreateTransactionRequest;
 import com.prateek.learning.transaction.model.TransactionType;
 import com.prateek.learning.transaction.repository.TransactionRepository;
@@ -10,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
@@ -32,6 +34,9 @@ class TransactionControllerIntegrationTest {
 
     @Autowired
     private TransactionRepository transactionRepository;
+
+    @MockitoBean
+    private TransactionEventPublisher transactionEventPublisher;
 
     @BeforeEach
     void setUp() {

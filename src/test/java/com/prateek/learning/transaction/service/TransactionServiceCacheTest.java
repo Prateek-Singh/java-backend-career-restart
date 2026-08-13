@@ -1,5 +1,6 @@
 package com.prateek.learning.transaction.service;
 
+import com.prateek.learning.kafka.producer.TransactionEventPublisher;
 import com.prateek.learning.transaction.model.Transaction;
 import com.prateek.learning.transaction.model.TransactionType;
 import com.prateek.learning.transaction.repository.TransactionRepository;
@@ -49,8 +50,15 @@ class TransactionServiceCacheTest {
         }
 
         @Bean
-        TransactionService transactionService(TransactionRepository transactionRepository) {
-            return new TransactionService(transactionRepository);
+        TransactionEventPublisher transactionEventPublisher() {
+            return mock(TransactionEventPublisher.class);
+        }
+
+        @Bean
+        TransactionService transactionService(
+                TransactionRepository transactionRepository,
+                TransactionEventPublisher transactionEventPublisher) {
+            return new TransactionService(transactionRepository, transactionEventPublisher);
         }
 
         @Bean

@@ -1,6 +1,8 @@
 package com.prateek.learning.transaction.service;
 
 import com.prateek.learning.common.exception.DuplicateTransactionException;
+import com.prateek.learning.kafka.event.TransactionCreatedEvent;
+import com.prateek.learning.kafka.producer.TransactionEventPublisher;
 import com.prateek.learning.transaction.dto.CreateTransactionRequest;
 import com.prateek.learning.transaction.exception.InvalidTransactionAmountException;
 import com.prateek.learning.transaction.exception.TransactionNotFoundException;
@@ -14,14 +16,20 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class TransactionService {
 
     private final TransactionRepository transactionRepository;
 
-    public TransactionService(TransactionRepository transactionRepository) {
+    private final TransactionEventPublisher transactionEventPublisher;
+
+    public TransactionService(
+            TransactionRepository transactionRepository,
+            TransactionEventPublisher transactionEventPublisher) {
         this.transactionRepository = transactionRepository;
+        this.transactionEventPublisher = transactionEventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -54,7 +62,22 @@ public class TransactionService {
         transaction.setType(request.type());
         transaction.setDescription(request.description());
         transaction.setTimestamp(Instant.now());
-        return transactionRepository.save(transaction);
+
+        Transaction savedTransaction = transactionRepository.save(transaction);
+
+        TransactionCreatedEvent event = new TransactionCreatedEvent(
+                UUID.randomUUID(),
+                "TRANSACTION_CREATED",
+                Instant.now(),
+                savedTransaction.getId(),
+                savedTransaction.getAccountId(),
+                savedTransaction.getAmount(),
+                savedTransaction.getType(),
+                savedTransaction.getTimestamp()
+        );
+
+        transactionEventPublisher.publish(event);
+        return savedTransaction;
     }
 
     @Transactional(readOnly = true)

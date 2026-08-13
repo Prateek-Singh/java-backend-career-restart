@@ -12,7 +12,7 @@ class FindLongestSubstringWith2DistinctCharactersTest {
 
     private final FindLongestSubstringWith2DistinctCharacters findLongestSubstring = new FindLongestSubstringWith2DistinctCharacters();
 
-    public static Stream<Arguments> data() {
+    public static Stream<Arguments> testCases() {
         return Stream.of(
                 Arguments.of("eceba", 3),
                 Arguments.of("ccaabbb", 5),
@@ -24,7 +24,7 @@ class FindLongestSubstringWith2DistinctCharactersTest {
     }
 
     @ParameterizedTest
-    @MethodSource("data")
+    @MethodSource("testCases")
     void shouldReturnLengthOfLongestSubstringWithAtMostTwoDistinctCharacters(String input, int expected) {
 
         assertThat(

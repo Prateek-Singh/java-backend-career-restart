@@ -13,13 +13,13 @@ class FindLongestSubstringNonRepeatingTest {
     private final FindLongestSubstringNonRepeating findLongestSubStringNonRepeating =  new FindLongestSubstringNonRepeating();
 
     @ParameterizedTest
-    @MethodSource("data")
+    @MethodSource("testCases")
     void findLongestSubstringNonRepeating(String input, String expected) {
         String result = findLongestSubStringNonRepeating.findLongestSubStringNonRepeating(input);
         assertThat(result).isEqualTo(expected);
     }
 
-    static Stream<Arguments> data() {
+    static Stream<Arguments> testCases() {
         return Stream.of(
                 Arguments.of("abba", "ab"),
                 Arguments.of("abcabcbb", "abc"),

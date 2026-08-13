@@ -13,7 +13,7 @@ class LongestRepeatingCharacterReplacementTest {
 
     private final LongestRepeatingCharacterReplacement longestRepeatingCharacterReplacement =  new LongestRepeatingCharacterReplacement();
 
-    public static Stream<Arguments> data() {
+    public static Stream<Arguments> testCases() {
         return Stream.of(
                 Arguments.of("ABAB", 2, 4),
                 Arguments.of("AABABBA", 1, 4),
@@ -26,7 +26,7 @@ class LongestRepeatingCharacterReplacementTest {
     }
 
     @ParameterizedTest
-    @MethodSource("data")
+    @MethodSource("testCases")
     void shouldReturnLongestRepeatingCharacterReplacement(String input, int k, int expected) {
         assertThat(
                 longestRepeatingCharacterReplacement.longestRepeatingCharacterReplacement(input, k))
