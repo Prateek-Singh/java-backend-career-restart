@@ -226,7 +226,7 @@ The real Redis integration test now uses Testcontainers, so a manually started R
 
 ## Kafka Transaction Events
 
-The first Kafka producer milestone is implemented for transaction creation.
+The project now contains both a transaction-event producer and the first application consumer milestone.
 
 Current Kafka contract:
 
@@ -237,6 +237,9 @@ Local replication     1
 Record key            transactionId
 Record value          TransactionCreatedEvent as JSON
 Producer              KafkaTemplate<String, TransactionCreatedEvent>
+Consumer group        transaction-created-events-cg
+Consumer listener     TransactionCreatedEventConsumer
+Processing boundary   TransactionCreatedEventHandler
 ```
 
 `transactionId` is used as the Kafka record key so events for the same transaction are routed consistently to the same partition. Kafka ordering is partition-local rather than global across the whole topic.
@@ -264,29 +267,66 @@ validate request
 -> return saved transaction
 ```
 
-This deliberately leaves the database/broker dual-write problem visible for learning: the database save can succeed while Kafka publication fails.
+Current consumer flow:
 
-The planned stronger design is transactional outbox, where the business row and outbox event row are persisted in the same local database transaction and a separate publisher sends pending events to Kafka.
+```text
+transaction-events
+-> @KafkaListener
+-> TransactionCreatedEventConsumer
+-> TransactionCreatedEventHandler
+-> LoggingTransactionCreatedEventHandler
+```
+
+The consumer uses an explicit group ID, `transaction-created-events-cg`, and delegates processing to a handler abstraction so Kafka-listener mechanics stay separate from future business/idempotency logic.
+
+The current implementation deliberately leaves the database/broker dual-write problem visible for learning: the database save can succeed while Kafka publication fails.
+
+The planned stronger producer-side design is transactional outbox, where the business row and outbox event row are persisted in the same local database transaction and a separate publisher sends pending events to Kafka.
 
 Outbox publication can still produce duplicates if Kafka accepts an event and the publisher fails before recording publication success. Consumer-side idempotency using a stable `eventId` is therefore a planned reliability milestone.
 
-Kafka integration testing uses Testcontainers and verifies a real round trip through:
+The target consumer reliability model is:
+
+```text
+receive event
+-> begin local DB transaction
+-> record eventId in processed-events storage using a unique constraint
+-> apply local business mutation
+-> commit both atomically
+-> allow Kafka offset progress after successful handling
+```
+
+A duplicate `eventId` should not repeat the business mutation. Persistent deduplication is a design target and is not implemented yet.
+
+Kafka testing now covers two useful integration paths.
+
+Publisher integration:
 
 ```text
 TransactionEventPublisher
 -> KafkaTemplate
 -> JSON serialization
 -> real Kafka broker
--> real consumer
+-> test consumer
 -> JSON deserialization
 -> TransactionCreatedEvent
 ```
 
-The integration test verifies both the Kafka record key and the consumed event payload.
+Application consumer flow integration:
+
+```text
+TransactionEventPublisher
+-> KafkaTemplate
+-> real Kafka broker
+-> JSON deserialization
+-> @KafkaListener
+-> TransactionCreatedEventConsumer
+-> TransactionCreatedEventHandler
+```
+
+The consumer-flow integration test uses Testcontainers Kafka and a mocked handler, then verifies the asynchronously delivered event with a bounded Mockito timeout.
 
 A manually started Kafka broker is not required for `mvn clean test`; Docker must be available for Testcontainers.
-
-
 ## Validation and Domain Rules
 
 The HTTP boundary uses Jakarta Bean Validation.
@@ -621,14 +661,17 @@ src/
 │   │   │   ├── day09/
 │   │   │   ├── day10/
 │   │   │   ├── day11/
-│   │   │   └── day12/
+│   │   │   ├── day12/
+│   │   │   └── day13/
 │   │   ├── java/
 │   │   │   ├── day01/
 │   │   │   ├── day02/
 │   │   │   └── day03/
 │   │   ├── kafka/
 │   │   │   ├── event/
-│   │   │   └── producer/
+│   │   │   ├── producer/
+│   │   │   └── consumer/
+│   │   │       └── handler/
 │   │   └── transaction/
 │   │       ├── config/
 │   │       ├── controller/
@@ -653,7 +696,9 @@ src/
     │   ├── dsa/
     │   ├── java/
     │   ├── kafka/
-    │   │   └── producer/
+    │   │   ├── producer/
+    │   │   ├── consumer/
+    │   │   └── integration/
     │   └── transaction/
     │       ├── controller/
     │       ├── service/
@@ -674,8 +719,35 @@ notes/
 ├── day-09.md
 ├── day-10.md
 ├── day-11.md
-└── day-12.md
+├── day-12.md
+└── day-13.md
 ```
+
+## Code Coverage
+
+JaCoCo generates an HTML coverage report as part of the Maven test lifecycle.
+
+Run:
+
+```bash
+mvn clean test
+```
+
+Report:
+
+```text
+target/site/jacoco/index.html
+```
+
+Current baseline:
+
+- Instruction coverage: 81%
+- Branch coverage: 77%
+- Line coverage: approximately 84.5%
+- Method coverage: approximately 84.2%
+- Class coverage: approximately 95.2%
+
+Coverage is currently used as a diagnostic signal rather than a hard build gate. Tests are prioritized around meaningful business, persistence, security, caching, failure, and messaging behavior rather than percentage maximization.
 
 ## Testing Approach
 
@@ -692,7 +764,9 @@ The project separates tests by responsibility.
 - **Redis cache error-handler tests** verify cache failures are logged/swallowed rather than rethrown.
 - **Redis integration tests** verify real Redis JSON serialization, cache writes, cache reads, and repository bypass on cache hit using Testcontainers.
 - **Kafka publisher unit tests** verify the expected topic, transaction-ID key, and event payload passed to `KafkaTemplate`.
-- **Kafka integration tests** verify real JSON serialization, broker communication, Kafka record key, and event deserialization using Testcontainers.
+- **Kafka consumer unit tests** verify listener-to-handler delegation without requiring a broker.
+- **Kafka publisher integration tests** verify real JSON serialization, broker communication, Kafka record key, and event deserialization using Testcontainers.
+- **Kafka consumer-flow integration tests** verify a real publisher-to-broker-to-`@KafkaListener` path and asynchronous handler delivery using Testcontainers.
 - **DSA tests** cover happy paths, edge cases, invalid input, duplicates, ties, and ordering assumptions.
 
 Invalid HTTP requests are tested to confirm that:
@@ -840,14 +914,6 @@ The JPA integration tests verify:
 - Practised a concise interview explanation of an idempotent transaction-creation API
 - Full `mvn clean test` passed
 
-### Day 9 Closure Snapshot
-
-- Focused study time: 3 hours 15 minutes
-- Confidence: Spring/JPA 8/10; Testing 8/10; SQL 8/10; DSA 6/10; System Design 7/10; Docker/Compose 7/10
-- `mvn clean test` passed
-- Day 9 changes committed and pushed
-- Duplicate transaction handling and service transaction boundaries are complete for the current milestone
-- DSA coaching will now include pattern revision, pattern discussion before coding, and one related take-home problem at day closure
 
 ### Day 10
 
@@ -873,13 +939,6 @@ The JPA integration tests verify:
 - Reinforced SQL conditional aggregation and conditional `HAVING` for accounts with at least three CREDIT transactions
 - Practised a concise Spring Security interview explanation
 - Full `mvn clean test` passed
-
-### Day 10 Closure Snapshot
-
-- Focused study time: 2 hours 30 minutes
-- Confidence: Spring/Security 6/10; Testing 8/10; SQL 8/10; DSA 7/10; System Design 7/10; Docker/Compose 8/10
-- Full `mvn clean test` passed
-- Day 10 changes were committed and pushed
 
 
 ### Day 11
@@ -907,17 +966,6 @@ The JPA integration tests verify:
 - Reinforced SQL conditional aggregation and `HAVING` for accounts with at least three CREDIT transactions
 - Full `mvn clean test` passed with Redis available for the real Redis integration test
 
-### Day 11 Closure Snapshot
-
-- DSA completed in-session; no routine DSA take-home will be assigned going forward
-- Spring Security retrieval completed
-- Redis cache foundation and graceful-degradation behavior completed
-- Cache-proxy, cache error-handler, and real Redis integration tests passed
-- SQL reinforcement completed
-- Full `mvn clean test` passed
-- Git commit/push pending at the time of README generation
-
-
 
 ### Day 12
 
@@ -938,13 +986,22 @@ The JPA integration tests verify:
 - Practised SQL date-range aggregation, `HAVING`, deterministic ordering, and `ROW_NUMBER` / `RANK` / `DENSE_RANK`
 - Full `mvn clean test` passed
 
-### Day 12 Closure Snapshot
 
-- Focused study time: 5 hours
-- Confidence: Kafka 6/10; RabbitMQ 6/10; Testing 7/10; SQL 7/10; DSA 7/10; System Design 7/10; Redis/Security 7/10; Docker/Compose 8/10
-- Final `mvn clean test` passed with the manually started Kafka broker stopped
-- Redis and Kafka integration tests are self-contained with Testcontainers
-- Day 12 code, tests, notes, and documentation were committed and pushed
+### Day 13
+
+- Reinforced Kafka topic, partition, consumer-group, offset, lag, rebalance, at-least-once delivery, idempotency, transactional-outbox, RabbitMQ routing, and HTTP `401`/`403` concepts through no-notes retrieval
+- Completed Minimum Size Subarray Sum using a positive-integer sliding window
+- Reinforced repeated shrinking while `sum >= target`, candidate-length update before removing the left value, and `O(n)` time / `O(1)` space reasoning
+- Added `TransactionCreatedEventConsumer` using `@KafkaListener` with explicit group `transaction-created-events-cg`
+- Added `TransactionCreatedEventHandler` and `LoggingTransactionCreatedEventHandler` so Kafka-listener concerns are separated from processing behavior
+- Added focused consumer unit coverage verifying listener-to-handler delegation
+- Added `TransactionEventFlowIntegrationTest` using Testcontainers Kafka to prove real publisher -> broker -> JSON deserialization -> `@KafkaListener` -> consumer -> handler delivery
+- Reinforced offset/commit failure scenarios and why at-least-once delivery requires idempotent consumers
+- Designed persistent consumer deduplication using stable `eventId`, a database unique constraint, and atomic local transaction boundaries for dedup record + business mutation
+- Reviewed retryable versus non-retryable consumer failures, poison-event handling, DLT trade-offs, and same-key ordering implications
+- Practised SQL conditional aggregation for CREDIT/DEBIT totals, net amount, last-30-day filtering, `HAVING`, and result ordering
+- Added JaCoCo reporting and established the first project coverage baseline
+- Kept persistent consumer idempotency, retry/DLT handling, and transactional outbox as future implementation milestones
 
 ## Learning Approach
 
@@ -969,8 +1026,9 @@ For each topic:
 - Extend Spring Security from the current HTTP Basic authentication foundation to credible resource-level authorization once user/account ownership is modelled
 - Add JWT/token authentication only after the current Spring Security fundamentals are stable and well tested
 - Continue reinforcing Redis failure behaviour and cache design through retrieval rather than adding unnecessary cache features
-- Implement the first Kafka consumer milestone after reviewing consumer groups, partition assignment, offsets, failure/redelivery, and idempotency
-- Add consumer-side idempotency, retry/backoff, dead-letter handling, and transactional outbox incrementally after the basic consumer path is clear and tested
+- Implement persistent consumer idempotency using stable `eventId`, a database unique constraint, and one local transaction for deduplication + business mutation
+- Add Kafka retry/backoff and dead-letter handling only after idempotent processing is implemented and tested
+- Implement transactional outbox incrementally after consumer reliability mechanics are stable
 - Refresh AWS through project work covering IAM, Secrets Manager, RDS/Aurora, S3, CloudWatch, VPC/security-group basics, ALB, and one practical container deployment path such as ECS/Fargate
 - Add a backend-focused AI learning track after core backend foundations: LLM fundamentals, Java/Spring integration, structured outputs/tool calling, embeddings/vector search or RAG only with a justified use case, plus AI security, PII, latency, cost, evaluation, and observability
 - Add API documentation
