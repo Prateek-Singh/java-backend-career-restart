@@ -226,7 +226,7 @@ The real Redis integration test now uses Testcontainers, so a manually started R
 
 ## Kafka Transaction Events
 
-The project now contains both a transaction-event producer and the first application consumer milestone.
+The project contains a transaction-event producer, a Spring Kafka application consumer, and persistent consumer-side idempotency.
 
 Current Kafka contract:
 
@@ -240,11 +240,12 @@ Producer              KafkaTemplate<String, TransactionCreatedEvent>
 Consumer group        transaction-created-events-cg
 Consumer listener     TransactionCreatedEventConsumer
 Processing boundary   TransactionCreatedEventHandler
+Persistent handler    PersistentTransactionCreatedEventHandler
 ```
 
 `transactionId` is used as the Kafka record key so events for the same transaction are routed consistently to the same partition. Kafka ordering is partition-local rather than global across the whole topic.
 
-`TransactionCreatedEvent` currently contains:
+`TransactionCreatedEvent` contains:
 
 - `eventId`
 - `eventType`
@@ -255,7 +256,7 @@ Processing boundary   TransactionCreatedEventHandler
 - `transactionType`
 - `transactionCreatedAt`
 
-`eventId` is deliberately separate from the business `transactionId`.
+`eventId` is deliberately separate from the business `transactionId`. It is the stable event identity used for consumer-side deduplication.
 
 Current create flow:
 
@@ -273,32 +274,68 @@ Current consumer flow:
 transaction-events
 -> @KafkaListener
 -> TransactionCreatedEventConsumer
--> TransactionCreatedEventHandler
--> LoggingTransactionCreatedEventHandler
+-> PersistentTransactionCreatedEventHandler
+-> TransactionEventProcessingService
+-> processed_events + transaction_event_audit
 ```
 
-The consumer uses an explicit group ID, `transaction-created-events-cg`, and delegates processing to a handler abstraction so Kafka-listener mechanics stay separate from future business/idempotency logic.
+The handler boundary keeps Kafka-listener mechanics separate from transactional event-processing behavior.
 
-The current implementation deliberately leaves the database/broker dual-write problem visible for learning: the database save can succeed while Kafka publication fails.
+### Persistent Consumer Idempotency
 
-The planned stronger producer-side design is transactional outbox, where the business row and outbox event row are persisted in the same local database transaction and a separate publisher sends pending events to Kafka.
+Consumer-side persistent idempotency is implemented using two tables:
 
-Outbox publication can still produce duplicates if Kafka accepts an event and the publisher fails before recording publication success. Consumer-side idempotency using a stable `eventId` is therefore a planned reliability milestone.
+```text
+processed_events
+- event_id primary key
+- processed_at
+- consumer_name
 
-The target consumer reliability model is:
+transaction_event_audit
+- id primary key
+- event_id unique
+- transaction_id
+- account_id
+- amount
+- transaction_type
+- event_timestamp
+- created_at
+```
+
+`transaction_event_audit.event_id` references `processed_events.event_id`. `transaction_id` is intentionally not a foreign key to the producer-side transaction table so the consumer persistence model does not require the producer and consumer to share the same business database boundary.
+
+The processing service uses one local database transaction:
 
 ```text
 receive event
--> begin local DB transaction
--> record eventId in processed-events storage using a unique constraint
--> apply local business mutation
+-> check whether eventId is already processed
+-> insert processed_events row
+-> insert transaction_event_audit row
 -> commit both atomically
--> allow Kafka offset progress after successful handling
 ```
 
-A duplicate `eventId` should not repeat the business mutation. Persistent deduplication is a design target and is not implemented yet.
+If the audit/business insert fails, the processed-event insert is rolled back as part of the same transaction. This avoids recording an event as processed when its business effect did not commit.
 
-Kafka testing now covers two useful integration paths.
+Sequential duplicate delivery is handled by the stable `eventId`: a previously processed event returns without creating another audit/business row.
+
+The database primary key/unique constraints remain the final race-safe uniqueness guard. A true concurrent race in which two consumers both pass the application pre-check and one later hits the uniqueness constraint is a known hardening case; graceful race-conflict handling is not yet implemented.
+
+### Producer Reliability
+
+The current producer still publishes directly after transaction persistence:
+
+```text
+DB save
+-> Kafka publish
+```
+
+This deliberately leaves the DB/Kafka dual-write failure window visible. The planned stronger producer-side design is transactional outbox, where the business row and outbox event row are committed in one local database transaction and a separate publisher sends pending events to Kafka.
+
+Outbox publication can still produce duplicate events if Kafka accepts a send and the publisher fails before recording publication success. Persistent consumer idempotency therefore remains necessary even after outbox is introduced.
+
+### Kafka Testing
+
+Kafka testing now covers:
 
 Publisher integration:
 
@@ -312,7 +349,7 @@ TransactionEventPublisher
 -> TransactionCreatedEvent
 ```
 
-Application consumer flow integration:
+Application consumer persistence integration:
 
 ```text
 TransactionEventPublisher
@@ -321,10 +358,17 @@ TransactionEventPublisher
 -> JSON deserialization
 -> @KafkaListener
 -> TransactionCreatedEventConsumer
--> TransactionCreatedEventHandler
+-> PersistentTransactionCreatedEventHandler
+-> TransactionEventProcessingService
+-> processed_events
+-> transaction_event_audit
 ```
 
-The consumer-flow integration test uses Testcontainers Kafka and a mocked handler, then verifies the asynchronously delivered event with a bounded Mockito timeout.
+The end-to-end Testcontainers test verifies that a real published event reaches the application consumer and produces the expected persisted audit state.
+
+A duplicate-delivery integration test first waits for the initial event to be fully processed, publishes the same event again, and verifies the persistent state remains at one processed-event row and one audit row for a bounded period using Awaitility.
+
+A separate Spring/JPA integration test verifies transactional rollback: if the audit insert violates a database constraint, the processed-event insert is rolled back as well.
 
 A manually started Kafka broker is not required for `mvn clean test`; Docker must be available for Testcontainers.
 ## Validation and Domain Rules
@@ -662,7 +706,8 @@ src/
 │   │   │   ├── day10/
 │   │   │   ├── day11/
 │   │   │   ├── day12/
-│   │   │   └── day13/
+│   │   │   ├── day13/
+│   │   │   └── day14/
 │   │   ├── java/
 │   │   │   ├── day01/
 │   │   │   ├── day02/
@@ -670,8 +715,12 @@ src/
 │   │   ├── kafka/
 │   │   │   ├── event/
 │   │   │   ├── producer/
-│   │   │   └── consumer/
-│   │   │       └── handler/
+│   │   │   ├── consumer/
+│   │   │   │   └── handler/
+│   │   │   ├── processing/
+│   │   │   └── persistence/
+│   │   │       ├── entity/
+│   │   │       └── repository/
 │   │   └── transaction/
 │   │       ├── config/
 │   │       ├── controller/
@@ -689,7 +738,8 @@ src/
 │       ├── application-jpa.yml
 │       └── db/
 │           └── migration/
-│               └── V1__create_transactions_table.sql
+│               ├── V1__create_transactions_table.sql
+│               └── V2__create_event_processing_audit_table.sql
 │
 └── test/
     ├── java/com/prateek/learning/
@@ -698,6 +748,7 @@ src/
     │   ├── kafka/
     │   │   ├── producer/
     │   │   ├── consumer/
+    │   │   ├── processing/
     │   │   └── integration/
     │   └── transaction/
     │       ├── controller/
@@ -720,7 +771,8 @@ notes/
 ├── day-10.md
 ├── day-11.md
 ├── day-12.md
-└── day-13.md
+├── day-13.md
+└── day-14.md
 ```
 
 ## Code Coverage
@@ -742,10 +794,10 @@ target/site/jacoco/index.html
 Current baseline:
 
 - Instruction coverage: 81%
-- Branch coverage: 77%
-- Line coverage: approximately 84.5%
-- Method coverage: approximately 84.2%
-- Class coverage: approximately 95.2%
+- Branch coverage: 76%
+- Line coverage: approximately 85.2%
+- Method coverage: approximately 83.4%
+- Class coverage: approximately 95.7%
 
 Coverage is currently used as a diagnostic signal rather than a hard build gate. Tests are prioritized around meaningful business, persistence, security, caching, failure, and messaging behavior rather than percentage maximization.
 
@@ -765,8 +817,11 @@ The project separates tests by responsibility.
 - **Redis integration tests** verify real Redis JSON serialization, cache writes, cache reads, and repository bypass on cache hit using Testcontainers.
 - **Kafka publisher unit tests** verify the expected topic, transaction-ID key, and event payload passed to `KafkaTemplate`.
 - **Kafka consumer unit tests** verify listener-to-handler delegation without requiring a broker.
+- **Kafka persistent-handler unit tests** verify handler-to-processing-service delegation.
+- **Kafka processing-service unit tests** verify new-event and duplicate-event branching plus entity mapping.
+- **Kafka processing integration tests** verify real JPA persistence, sequential duplicate suppression, and rollback of the dedup record when the audit/business insert fails.
 - **Kafka publisher integration tests** verify real JSON serialization, broker communication, Kafka record key, and event deserialization using Testcontainers.
-- **Kafka consumer-flow integration tests** verify a real publisher-to-broker-to-`@KafkaListener` path and asynchronous handler delivery using Testcontainers.
+- **Kafka consumer-flow integration tests** verify a real publisher-to-broker-to-`@KafkaListener` path through the persistent handler and into the database, including duplicate redelivery suppression using Awaitility.
 - **DSA tests** cover happy paths, edge cases, invalid input, duplicates, ties, and ordering assumptions.
 
 Invalid HTTP requests are tested to confirm that:
@@ -1003,6 +1058,26 @@ The JPA integration tests verify:
 - Added JaCoCo reporting and established the first project coverage baseline
 - Kept persistent consumer idempotency, retry/DLT handling, and transactional outbox as future implementation milestones
 
+### Day 14
+
+- Reinforced Kafka offset/commit failure behavior, RabbitMQ routing terminology, `equals()`/`hashCode()`, and Java concurrency through no-notes retrieval
+- Reviewed race conditions, atomicity versus visibility, `volatile`, `synchronized`, `AtomicInteger`, `ExecutorService`, and JVM-local versus distributed concurrency
+- Connected Java synchronization to multi-pod backend behavior and reinforced database uniqueness as the final guard for duplicate transaction creation
+- Reviewed optimistic and pessimistic locking, including stale-version detection and lost-update prevention
+- Completed Container With Most Water using the two-pointer pattern in `O(n)` time and `O(1)` extra space
+- Added Flyway migration `V2__create_event_processing_audit_table.sql`
+- Added Kafka-owned persistence for `processed_events` and `transaction_event_audit`
+- Added `TransactionEventProcessingService` with one local `@Transactional` boundary for deduplication + audit/business persistence
+- Replaced the logging-only handler with `PersistentTransactionCreatedEventHandler`
+- Added processing-service unit tests, persistent-handler unit tests, and Spring/JPA integration tests
+- Verified sequential duplicate delivery does not create a second audit/business effect
+- Verified audit/business insert failure rolls back the processed-event row
+- Extended the real Kafka Testcontainers flow to prove publisher -> broker -> listener -> persistent handler -> processing service -> database
+- Added Awaitility-based duplicate-delivery verification so the test waits for the first event, republishes the same event, and confirms persistent state remains stable
+- Completed a guided senior system-design walkthrough covering requirements, consistency, API, MySQL, Redis, Kafka, outbox, consumer idempotency, scale, and failure behavior
+- Practised SQL top-3 account net-amount aggregation and a spoken explanation of why `synchronized` does not coordinate across multiple Spring Boot pods
+- Final `mvn clean test` passed
+
 ## Learning Approach
 
 For each topic:
@@ -1026,9 +1101,9 @@ For each topic:
 - Extend Spring Security from the current HTTP Basic authentication foundation to credible resource-level authorization once user/account ownership is modelled
 - Add JWT/token authentication only after the current Spring Security fundamentals are stable and well tested
 - Continue reinforcing Redis failure behaviour and cache design through retrieval rather than adding unnecessary cache features
-- Implement persistent consumer idempotency using stable `eventId`, a database unique constraint, and one local transaction for deduplication + business mutation
-- Add Kafka retry/backoff and dead-letter handling only after idempotent processing is implemented and tested
-- Implement transactional outbox incrementally after consumer reliability mechanics are stable
+- Harden concurrent duplicate races so a DB uniqueness conflict is translated into a safe already-processed outcome
+- Add Kafka retry/backoff and dead-letter handling now that persistent idempotency is implemented and tested
+- Implement transactional outbox incrementally after retry/DLT behavior is understood
 - Refresh AWS through project work covering IAM, Secrets Manager, RDS/Aurora, S3, CloudWatch, VPC/security-group basics, ALB, and one practical container deployment path such as ECS/Fargate
 - Add a backend-focused AI learning track after core backend foundations: LLM fundamentals, Java/Spring integration, structured outputs/tool calling, embeddings/vector search or RAG only with a justified use case, plus AI security, PII, latency, cost, evaluation, and observability
 - Add API documentation
