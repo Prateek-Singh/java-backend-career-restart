@@ -320,6 +320,26 @@ Sequential duplicate delivery is handled by the stable `eventId`: a previously p
 
 The database primary key/unique constraints remain the final race-safe uniqueness guard. A true concurrent race in which two consumers both pass the application pre-check and one later hits the uniqueness constraint is a known hardening case; graceful race-conflict handling is not yet implemented.
 
+### Kafka Retry / Backoff / Dead-Letter Handling
+
+Consumer failure handling now uses Spring Kafka `DefaultErrorHandler` with `DeadLetterPublishingRecoverer`. Retryable processing failures use bounded exponential backoff:
+
+```text
+initial delivery attempt
+-> retry after 1 second
+-> retry after 2 seconds
+-> retry after 4 seconds
+-> publish exhausted record to transaction-events-dlt
+```
+
+The DLT resolver preserves the original partition by publishing to the same partition number on `transaction-events-dlt`. The DLT therefore needs at least as many partitions as the source topic for this topology.
+
+Listener payloads are Bean Validated before business-handler execution. Framework-fatal validation/conversion failures are sent to the DLT without invoking the business handler. Retry-count behavior is tested separately from Kafka integration behavior so integration tests do not depend on exact handler-invocation counts or Spring exception-wrapper classes.
+
+The DLT integration tests consume values as raw `byte[]`, preserve the record key, and verify original-topic, original-partition, and exception metadata headers. Test consumer configuration disables JSON type-header precedence so the configured `TransactionCreatedEvent` default target type is used consistently.
+
+Malformed JSON / raw-byte DLT serializer hardening remains a follow-up and is not claimed as covered by the current integration tests.
+
 ### Producer Reliability
 
 The current producer still publishes directly after transaction persistence:
@@ -772,7 +792,8 @@ notes/
 ├── day-11.md
 ├── day-12.md
 ├── day-13.md
-└── day-14.md
+├── day-14.md
+└── day-15.md
 ```
 
 ## Code Coverage
@@ -793,11 +814,11 @@ target/site/jacoco/index.html
 
 Current baseline:
 
-- Instruction coverage: 81%
-- Branch coverage: 76%
-- Line coverage: approximately 85.2%
-- Method coverage: approximately 83.4%
-- Class coverage: approximately 95.7%
+- Instruction coverage: 82%
+- Branch coverage: 77%
+- Line coverage: approximately 87.4%
+- Method coverage: approximately 86.2%
+- Class coverage: approximately 96.1%
 
 Coverage is currently used as a diagnostic signal rather than a hard build gate. Tests are prioritized around meaningful business, persistence, security, caching, failure, and messaging behavior rather than percentage maximization.
 
@@ -822,6 +843,8 @@ The project separates tests by responsibility.
 - **Kafka processing integration tests** verify real JPA persistence, sequential duplicate suppression, and rollback of the dedup record when the audit/business insert fails.
 - **Kafka publisher integration tests** verify real JSON serialization, broker communication, Kafka record key, and event deserialization using Testcontainers.
 - **Kafka consumer-flow integration tests** verify a real publisher-to-broker-to-`@KafkaListener` path through the persistent handler and into the database, including duplicate redelivery suppression using Awaitility.
+- **Kafka retry/DLT policy tests** verify three exponential retries at 1s, 2s, and 4s before STOP.
+- **Kafka retry/DLT integration tests** verify retryable handler failure reaches `transaction-events-dlt`, DLT key/value and source metadata are preserved, and invalid Bean-Validation input reaches DLT without invoking the business handler.
 - **DSA tests** cover happy paths, edge cases, invalid input, duplicates, ties, and ordering assumptions.
 
 Invalid HTTP requests are tested to confirm that:
@@ -1077,6 +1100,23 @@ The JPA integration tests verify:
 - Completed a guided senior system-design walkthrough covering requirements, consistency, API, MySQL, Redis, Kafka, outbox, consumer idempotency, scale, and failure behavior
 - Practised SQL top-3 account net-amount aggregation and a spoken explanation of why `synchronized` does not coordinate across multiple Spring Boot pods
 - Final `mvn clean test` passed
+
+### Day 15
+
+- Extended Java concurrency reinforcement with `ReentrantLock`, deadlock conditions/prevention, `ConcurrentHashMap`, and `CompletableFuture`
+- Completed 3Sum using sorting plus two pointers, including duplicate skipping and `O(n^2)` time / `O(1)` algorithmic extra space reasoning
+- Practised latest-transaction-per-account SQL using `ROW_NUMBER()` with deterministic ordering and MySQL last-30-day syntax
+- Repeated the transaction/event system-design exercise with less guidance, covering scale, indexes, outbox backlog, Kafka partitions/consumers, failure handling, observability, and trade-offs
+- Added Bean Validation to `TransactionCreatedEvent` listener payloads
+- Added Spring Kafka `DefaultErrorHandler` and `DeadLetterPublishingRecoverer` for `transaction-events-dlt`
+- Added bounded exponential retry/backoff with three retries at 1s, 2s, and 4s
+- Added a deterministic backoff-policy unit test instead of asserting exact Kafka handler invocation counts
+- Added Kafka retry/DLT integration coverage using raw `byte[]` DLT values, unique test keys, and source/exception metadata checks
+- Added validation-failure DLT coverage proving invalid events do not reach the business handler
+- Stabilized JSON consumer targeting in tests with `spring.json.use.type.headers=false`
+- Kept malformed JSON/raw-byte DLT serializer hardening as a follow-up rather than over-claiming coverage
+- Final `mvn clean test` passed
+
 
 ## Learning Approach
 
